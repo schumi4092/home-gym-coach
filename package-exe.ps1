@@ -17,6 +17,21 @@ if (Test-Path $installerStageRoot) {
 New-Item -ItemType Directory -Path $installerStageRoot | Out-Null
 Copy-Item -Path (Join-Path $portableRoot "*") -Destination $installerStageRoot -Recurse -Force
 
+$packagedFiles = Get-ChildItem -LiteralPath $installerStageRoot -Recurse -File |
+  Sort-Object FullName |
+  ForEach-Object { $_.FullName.Substring($installerStageRoot.Length + 1) }
+
+$copyCommands = foreach ($relativePath in $packagedFiles) {
+  $relativeDir = Split-Path $relativePath -Parent
+  $leafName = Split-Path $relativePath -Leaf
+
+  if ($relativeDir -and $relativeDir -ne ".") {
+    "if not exist ""%DEST%\$relativeDir"" mkdir ""%DEST%\$relativeDir"""
+  }
+
+  "copy /Y ""%SRC%$leafName"" ""%DEST%\$relativePath"" >nul"
+}
+
 if (Test-Path $targetExe) {
   try {
     Remove-Item -LiteralPath $targetExe -Force
@@ -37,13 +52,13 @@ set "DEST=%LOCALAPPDATA%\MyWorkoutPortable"
 set "SHORTCUT=%USERPROFILE%\Desktop\Home Gym Coach.lnk"
 
 if not exist "%DEST%" mkdir "%DEST%"
-xcopy "%SRC%*" "%DEST%\" /E /I /Y >nul
+{0}
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:SHORTCUT); $s.TargetPath=Join-Path $env:DEST 'open-workout.bat'; $s.WorkingDirectory=$env:DEST; $s.IconLocation=($env:SystemRoot + '\System32\imageres.dll,15'); $s.Save()"
 
 start "" "%DEST%\open-workout.bat"
 exit /b 0
-'@
+'@ -f ($copyCommands -join "`r`n")
 
 Set-Content -LiteralPath (Join-Path $installerStageRoot "install-app.bat") -Value $installScript -Encoding ASCII
 

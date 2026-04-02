@@ -55,6 +55,41 @@ function Test-ExistingWorkoutServer {
   }
 }
 
+function Get-ReferencedAssets {
+  param([string]$IndexPath)
+
+  $content = Get-Content -LiteralPath $IndexPath -Raw
+  $matches = [regex]::Matches($content, '(?:src|href)="\.\/([^"]+)"')
+
+  return $matches |
+    ForEach-Object { $_.Groups[1].Value } |
+    Where-Object { $_ -and ($_ -notmatch '^(?:https?:|data:|mailto:|#)') } |
+    Select-Object -Unique
+}
+
+function Test-BuildCompleteness {
+  param(
+    [string]$RootPath,
+    [string]$IndexPath
+  )
+
+  $missingAssets = @()
+
+  foreach ($assetPath in (Get-ReferencedAssets -IndexPath $IndexPath)) {
+    $fullAssetPath = [IO.Path]::GetFullPath((Join-Path $RootPath $assetPath))
+
+    if (-not $fullAssetPath.StartsWith($RootPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+      continue
+    }
+
+    if (-not (Test-Path -LiteralPath $fullAssetPath -PathType Leaf)) {
+      $missingAssets += $assetPath
+    }
+  }
+
+  return $missingAssets
+}
+
 function Handle-Client {
   param($client, $root)
 
@@ -141,6 +176,23 @@ $indexPath = Join-Path $Root "index.html"
 
 if (-not (Test-Path -LiteralPath $indexPath)) {
   throw "Could not find index.html in $Root"
+}
+
+$missingAssets = Test-BuildCompleteness -RootPath $Root -IndexPath $indexPath
+
+if ($missingAssets.Count -gt 0) {
+  Write-Host ""
+  Write-Host "ERROR: This app package is incomplete." -ForegroundColor Red
+  Write-Host ""
+  Write-Host "Missing files referenced by index.html:" -ForegroundColor Yellow
+  foreach ($asset in $missingAssets) {
+    Write-Host " - $asset" -ForegroundColor Yellow
+  }
+  Write-Host ""
+  Write-Host "Please re-download the full release package or ask the sender to include the entire assets folder." -ForegroundColor Yellow
+  Write-Host ""
+  pause
+  exit 1
 }
 
 $port = $null
