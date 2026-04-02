@@ -4,6 +4,7 @@
 
 ![首頁截圖](docs/screenshot-home.png)
 ![訓練中截圖](docs/screenshot-workout.png)
+![進度追蹤截圖](docs/screenshot-progress.png)
 
 ---
 
