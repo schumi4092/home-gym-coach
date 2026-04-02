@@ -83,7 +83,14 @@ try {
     }
   }
 
-  throw
+  Write-Host ""
+  Write-Host "ERROR: Port $StartPort is already in use by another program." -ForegroundColor Red
+  Write-Host ""
+  Write-Host "To fix this, close the program using port $StartPort and try again." -ForegroundColor Yellow
+  Write-Host "You can find it by running: netstat -ano | findstr :$StartPort" -ForegroundColor Yellow
+  Write-Host ""
+  pause
+  exit 1
 }
 
 $prefix = "http://127.0.0.1:$port/"
