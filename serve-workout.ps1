@@ -11,26 +11,23 @@ function Get-ContentType {
 
   switch ([IO.Path]::GetExtension($Path).ToLowerInvariant()) {
     ".html" { return "text/html; charset=utf-8" }
-    ".js" { return "text/javascript; charset=utf-8" }
-    ".css" { return "text/css; charset=utf-8" }
-    ".svg" { return "image/svg+xml" }
+    ".js"   { return "text/javascript; charset=utf-8" }
+    ".css"  { return "text/css; charset=utf-8" }
+    ".svg"  { return "image/svg+xml" }
     ".json" { return "application/json; charset=utf-8" }
-    ".png" { return "image/png" }
-    ".jpg" { return "image/jpeg" }
+    ".png"  { return "image/png" }
+    ".jpg"  { return "image/jpeg" }
     ".jpeg" { return "image/jpeg" }
-    ".gif" { return "image/gif" }
-    ".ico" { return "image/x-icon" }
+    ".gif"  { return "image/gif" }
+    ".ico"  { return "image/x-icon" }
     ".webp" { return "image/webp" }
-    ".txt" { return "text/plain; charset=utf-8" }
+    ".txt"  { return "text/plain; charset=utf-8" }
     default { return "application/octet-stream" }
   }
 }
 
 function Get-FreePort {
-  param(
-    [int]$From,
-    [int]$To
-  )
+  param([int]$From, [int]$To)
 
   for ($port = $From; $port -le $To; $port += 1) {
     $listener = [System.Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $port)
@@ -40,10 +37,7 @@ function Get-FreePort {
     } catch {
       continue
     } finally {
-      try {
-        $listener.Stop()
-      } catch {
-      }
+      try { $listener.Stop() } catch {}
     }
   }
 
@@ -58,6 +52,86 @@ function Test-ExistingWorkoutServer {
     return $response.Content -like "*Home Gym Coach*"
   } catch {
     return $false
+  }
+}
+
+function Handle-Client {
+  param($client, $root)
+
+  function Get-ContentType2([string]$Path) {
+    switch ([IO.Path]::GetExtension($Path).ToLowerInvariant()) {
+      ".html" { return "text/html; charset=utf-8" }
+      ".js"   { return "text/javascript; charset=utf-8" }
+      ".css"  { return "text/css; charset=utf-8" }
+      ".svg"  { return "image/svg+xml" }
+      ".json" { return "application/json; charset=utf-8" }
+      ".png"  { return "image/png" }
+      ".jpg"  { return "image/jpeg" }
+      ".jpeg" { return "image/jpeg" }
+      ".gif"  { return "image/gif" }
+      ".ico"  { return "image/x-icon" }
+      ".webp" { return "image/webp" }
+      ".txt"  { return "text/plain; charset=utf-8" }
+      default { return "application/octet-stream" }
+    }
+  }
+
+  function Write-HttpResponse($Stream, [int]$StatusCode, [string]$StatusText, [byte[]]$Body, [string]$ContentType) {
+    $writer = New-Object IO.StreamWriter($Stream, [Text.Encoding]::ASCII, 1024, $true)
+    $writer.NewLine = "`r`n"
+    $writer.WriteLine("HTTP/1.1 $StatusCode $StatusText")
+    $writer.WriteLine("Content-Type: $ContentType")
+    $writer.WriteLine("Content-Length: $($Body.Length)")
+    $writer.WriteLine("Connection: close")
+    $writer.WriteLine()
+    $writer.Flush()
+    $Stream.Write($Body, 0, $Body.Length)
+    $Stream.Flush()
+  }
+
+  try {
+    $stream = $client.GetStream()
+    $reader = New-Object IO.StreamReader($stream, [Text.Encoding]::ASCII, $false, 1024, $true)
+    $requestLine = $reader.ReadLine()
+
+    if ([string]::IsNullOrWhiteSpace($requestLine)) { return }
+
+    while ($true) {
+      $headerLine = $reader.ReadLine()
+      if ([string]::IsNullOrEmpty($headerLine)) { break }
+    }
+
+    $parts = $requestLine.Split(" ")
+    $rawPath = if ($parts.Length -ge 2) { $parts[1] } else { "/" }
+    $cleanPath = $rawPath.Split("?")[0].TrimStart("/")
+    $requestPath = [Uri]::UnescapeDataString($cleanPath)
+
+    if ([string]::IsNullOrWhiteSpace($requestPath)) {
+      $requestPath = "index.html"
+    }
+
+    $localPath = Join-Path $root $requestPath
+    $resolvedPath = [IO.Path]::GetFullPath($localPath)
+
+    if (-not $resolvedPath.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+      $body = [Text.Encoding]::UTF8.GetBytes("Forbidden")
+      Write-HttpResponse -Stream $stream -StatusCode 403 -StatusText "Forbidden" -Body $body -ContentType "text/plain; charset=utf-8"
+      return
+    }
+
+    if (-not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+      $body = [Text.Encoding]::UTF8.GetBytes("Not Found")
+      Write-HttpResponse -Stream $stream -StatusCode 404 -StatusText "Not Found" -Body $body -ContentType "text/plain; charset=utf-8"
+      return
+    }
+
+    $body = [IO.File]::ReadAllBytes($resolvedPath)
+    $contentType = Get-ContentType2 -Path $resolvedPath
+    Write-HttpResponse -Stream $stream -StatusCode 200 -StatusText "OK" -Body $body -ContentType $contentType
+  } finally {
+    if ($reader) { $reader.Dispose() }
+    if ($stream) { $stream.Dispose() }
+    $client.Dispose()
   }
 }
 
@@ -97,28 +171,6 @@ $prefix = "http://127.0.0.1:$port/"
 $listener = [System.Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $port)
 $listener.Start()
 
-function Write-HttpResponse {
-  param(
-    [System.Net.Sockets.NetworkStream]$Stream,
-    [int]$StatusCode,
-    [string]$StatusText,
-    [byte[]]$Body,
-    [string]$ContentType
-  )
-
-  $writer = New-Object IO.StreamWriter($Stream, [Text.Encoding]::ASCII, 1024, $true)
-  $writer.NewLine = "`r`n"
-  $writer.WriteLine("HTTP/1.1 $StatusCode $StatusText")
-  $writer.WriteLine("Content-Type: $ContentType")
-  $writer.WriteLine("Content-Length: $($Body.Length)")
-  $writer.WriteLine("Connection: close")
-  $writer.WriteLine()
-  $writer.Flush()
-
-  $Stream.Write($Body, 0, $Body.Length)
-  $Stream.Flush()
-}
-
 Start-Process $prefix | Out-Null
 Write-Host "Home Gym Coach is running at $prefix"
 Write-Host "Keep this window open while using the app."
@@ -126,59 +178,86 @@ Write-Host "Keep this window open while using the app."
 try {
   while ($true) {
     $client = $listener.AcceptTcpClient()
+    $rootCopy = $Root
+    $runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+    $runspace.Open()
+    $ps = [System.Management.Automation.PowerShell]::Create()
+    $ps.Runspace = $runspace
+    $ps.AddScript({
+      param($client, $root)
 
-    try {
-      $stream = $client.GetStream()
-      $reader = New-Object IO.StreamReader($stream, [Text.Encoding]::ASCII, $false, 1024, $true)
-      $requestLine = $reader.ReadLine()
-
-      if ([string]::IsNullOrWhiteSpace($requestLine)) {
-        continue
-      }
-
-      while ($true) {
-        $headerLine = $reader.ReadLine()
-        if ([string]::IsNullOrEmpty($headerLine)) {
-          break
+      function Get-CT([string]$Path) {
+        switch ([IO.Path]::GetExtension($Path).ToLowerInvariant()) {
+          ".html" { return "text/html; charset=utf-8" }
+          ".js"   { return "text/javascript; charset=utf-8" }
+          ".css"  { return "text/css; charset=utf-8" }
+          ".svg"  { return "image/svg+xml" }
+          ".json" { return "application/json; charset=utf-8" }
+          ".png"  { return "image/png" }
+          ".jpg"  { return "image/jpeg" }
+          ".jpeg" { return "image/jpeg" }
+          ".gif"  { return "image/gif" }
+          ".ico"  { return "image/x-icon" }
+          ".webp" { return "image/webp" }
+          ".txt"  { return "text/plain; charset=utf-8" }
+          default { return "application/octet-stream" }
         }
       }
 
-      $parts = $requestLine.Split(" ")
-      $rawPath = if ($parts.Length -ge 2) { $parts[1] } else { "/" }
-      $cleanPath = $rawPath.Split("?")[0].TrimStart("/")
-      $requestPath = [Uri]::UnescapeDataString($cleanPath)
-
-      if ([string]::IsNullOrWhiteSpace($requestPath)) {
-        $requestPath = "index.html"
+      function Send-Response($stream, [int]$code, [string]$text, [byte[]]$body, [string]$ct) {
+        $w = New-Object IO.StreamWriter($stream, [Text.Encoding]::ASCII, 1024, $true)
+        $w.NewLine = "`r`n"
+        $w.WriteLine("HTTP/1.1 $code $text")
+        $w.WriteLine("Content-Type: $ct")
+        $w.WriteLine("Content-Length: $($body.Length)")
+        $w.WriteLine("Connection: close")
+        $w.WriteLine()
+        $w.Flush()
+        $stream.Write($body, 0, $body.Length)
+        $stream.Flush()
       }
 
-      $localPath = Join-Path $Root $requestPath
-      $resolvedPath = [IO.Path]::GetFullPath($localPath)
+      try {
+        $stream = $client.GetStream()
+        $reader = New-Object IO.StreamReader($stream, [Text.Encoding]::ASCII, $false, 1024, $true)
+        $requestLine = $reader.ReadLine()
+        if ([string]::IsNullOrWhiteSpace($requestLine)) { return }
 
-      if (-not $resolvedPath.StartsWith($Root, [System.StringComparison]::OrdinalIgnoreCase)) {
-        $body = [Text.Encoding]::UTF8.GetBytes("Forbidden")
-        Write-HttpResponse -Stream $stream -StatusCode 403 -StatusText "Forbidden" -Body $body -ContentType "text/plain; charset=utf-8"
-        continue
-      }
+        while ($true) {
+          $h = $reader.ReadLine()
+          if ([string]::IsNullOrEmpty($h)) { break }
+        }
 
-      if (-not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
-        $body = [Text.Encoding]::UTF8.GetBytes("Not Found")
-        Write-HttpResponse -Stream $stream -StatusCode 404 -StatusText "Not Found" -Body $body -ContentType "text/plain; charset=utf-8"
-        continue
-      }
+        $parts = $requestLine.Split(" ")
+        $rawPath = if ($parts.Length -ge 2) { $parts[1] } else { "/" }
+        $cleanPath = $rawPath.Split("?")[0].TrimStart("/")
+        $requestPath = [Uri]::UnescapeDataString($cleanPath)
+        if ([string]::IsNullOrWhiteSpace($requestPath)) { $requestPath = "index.html" }
 
-      $body = [IO.File]::ReadAllBytes($resolvedPath)
-      $contentType = Get-ContentType -Path $resolvedPath
-      Write-HttpResponse -Stream $stream -StatusCode 200 -StatusText "OK" -Body $body -ContentType $contentType
-    } finally {
-      if ($reader) {
-        $reader.Dispose()
+        $localPath = Join-Path $root $requestPath
+        $resolvedPath = [IO.Path]::GetFullPath($localPath)
+
+        if (-not $resolvedPath.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+          Send-Response $stream 403 "Forbidden" ([Text.Encoding]::UTF8.GetBytes("Forbidden")) "text/plain; charset=utf-8"
+          return
+        }
+
+        if (-not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+          Send-Response $stream 404 "Not Found" ([Text.Encoding]::UTF8.GetBytes("Not Found")) "text/plain; charset=utf-8"
+          return
+        }
+
+        $body = [IO.File]::ReadAllBytes($resolvedPath)
+        Send-Response $stream 200 "OK" $body (Get-CT $resolvedPath)
+      } finally {
+        if ($reader) { $reader.Dispose() }
+        if ($stream) { $stream.Dispose() }
+        $client.Dispose()
       }
-      if ($stream) {
-        $stream.Dispose()
-      }
-      $client.Dispose()
-    }
+    }) | Out-Null
+    $ps.AddArgument($client) | Out-Null
+    $ps.AddArgument($rootCopy) | Out-Null
+    $ps.BeginInvoke() | Out-Null
   }
 } finally {
   $listener.Stop()
