@@ -1,0 +1,36 @@
+$ErrorActionPreference = "Stop"
+
+$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$releaseRoot = Join-Path $projectRoot "release"
+$portableRoot = Join-Path $releaseRoot "my-workout-portable"
+
+Write-Host "Building project..."
+npm run build
+
+if ($LASTEXITCODE -ne 0) {
+  throw "Build failed."
+}
+
+if (Test-Path $portableRoot) {
+  Remove-Item -LiteralPath $portableRoot -Recurse -Force
+}
+
+New-Item -ItemType Directory -Path $portableRoot | Out-Null
+Copy-Item -Path (Join-Path $projectRoot "dist\*") -Destination $portableRoot -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot "serve-workout.ps1") -Destination $portableRoot -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot "create-desktop-shortcut.bat") -Destination $portableRoot -Force
+
+$launcher = @'
+@echo off
+setlocal
+set "APP_ROOT=%~dp0."
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0serve-workout.ps1" -Root "%APP_ROOT%" -StartPort 8765 -EndPort 8765
+'@
+
+Set-Content -LiteralPath (Join-Path $portableRoot "open-workout.bat") -Value $launcher -Encoding ASCII
+
+Write-Host ""
+Write-Host "Portable package created:"
+Write-Host $portableRoot
+Write-Host ""
+Write-Host "Send this folder to your friend."
