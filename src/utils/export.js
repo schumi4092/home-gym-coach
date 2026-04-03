@@ -1,15 +1,14 @@
 import { STORAGE_KEYS } from "../constants/defaults.js";
 import { storage } from "../storage/index.js";
-import { calcAvgRpe, formatLocalDate } from "./format.js";
+import { calcAvgRpe, formatLocalDate, isLocalDateWithinDays } from "./format.js";
+import { normalizeHistory } from "./history.js";
 
-export function exportToMarkdown(history, programs) {
+export function exportToMarkdown(history) {
   if (history.length === 0) return "目前沒有訓練紀錄。";
 
   const lines = [];
   const totalMinutes = history.reduce((sum, e) => sum + (e.duration || 0), 0);
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-  const recentSessions = history.filter((e) => new Date(e.date) >= sevenDaysAgo).length;
+  const recentSessions = history.filter((entry) => isLocalDateWithinDays(entry.date, 7)).length;
 
   lines.push("# 訓練紀錄報告");
   lines.push(`> 匯出時間：${formatLocalDate()}`);
@@ -73,11 +72,12 @@ export function exportBackup(history, programs) {
 export async function importBackup(file, setHistory, setPrograms) {
   const text = await file.text();
   const data = JSON.parse(text);
-  if (!data.version || !Array.isArray(data.history) || !Array.isArray(data.programs)) {
+  if (!data.version || !Array.isArray(data.history) || !Array.isArray(data.programs) || data.programs.length === 0) {
     throw new Error("invalid format");
   }
-  await storage.set(STORAGE_KEYS.history, JSON.stringify(data.history));
+  const nextHistory = normalizeHistory(data.history);
+  await storage.set(STORAGE_KEYS.history, JSON.stringify(nextHistory));
   await storage.set(STORAGE_KEYS.program, JSON.stringify(data.programs));
-  setHistory(data.history);
+  setHistory(nextHistory);
   setPrograms(data.programs);
 }

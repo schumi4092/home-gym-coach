@@ -1,5 +1,7 @@
 import { TRAINING_FLOW } from "../constants/defaults.js";
 import { T } from "../constants/theme.js";
+import { getDaysSinceLocalDate } from "./format.js";
+import { sortHistoryDescending } from "./history.js";
 
 export function getDefaultStep(unit) {
   if (unit === "kg") return 1;
@@ -70,10 +72,10 @@ export function hydrateHistoryEntry(entry, programs) {
 }
 
 export function getNextProgramId(history) {
-  const completedSessions = history.filter((entry) => entry.dayId);
-  if (completedSessions.length === 0) return "upper-a";
+  const latestCompletedSession = sortHistoryDescending(history).find((entry) => entry.dayId);
+  if (!latestCompletedSession) return "upper-a";
 
-  const lastIndex = TRAINING_FLOW.findIndex((item) => item.type === completedSessions[0].dayId);
+  const lastIndex = TRAINING_FLOW.findIndex((item) => item.type === latestCompletedSession.dayId);
   if (lastIndex === -1) return "upper-a";
 
   for (let offset = 1; offset <= TRAINING_FLOW.length; offset += 1) {
@@ -86,7 +88,7 @@ export function getNextProgramId(history) {
 
 export function getRecoveryText(entry, currentDayTime) {
   if (!entry) return { label: "可安排", color: T.green };
-  const daysAgo = Math.floor((currentDayTime - new Date(entry.date).getTime()) / 86400000);
+  const daysAgo = getDaysSinceLocalDate(entry.date, currentDayTime);
   if (daysAgo <= 1) return { label: "剛做過", color: T.orange };
   if (daysAgo <= 2) return { label: "接近恢復", color: T.amber };
   return { label: "可安排", color: T.green };

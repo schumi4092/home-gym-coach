@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { T, primaryMiniButtonStyle, secondaryMiniButtonStyle } from "../constants/theme.js";
+import { T, panelStyle, primaryMiniButtonStyle, secondaryMiniButtonStyle } from "../constants/theme.js";
 import { formatSeconds } from "../utils/format.js";
 
 export function Timer({ sec = 90 }) {
@@ -45,7 +45,7 @@ export function Timer({ sec = 90 }) {
   const circumference = 2 * Math.PI * radius;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0 4px" }}>
+    <div style={{ ...panelStyle, display: "flex", alignItems: "center", gap: 12, padding: "12px 12px", marginTop: 10 }}>
       <div style={{ position: "relative", width: 40, height: 40, flexShrink: 0 }}>
         <svg width="40" height="40" viewBox="0 0 40 40">
           <circle cx="20" cy="20" r={radius} fill="none" stroke={T.bg3} strokeWidth="2.5" />
@@ -71,7 +71,7 @@ export function Timer({ sec = 90 }) {
               <button
                 key={seconds}
                 onClick={() => setTotal(seconds)}
-                style={{ fontSize: 13, padding: "4px 10px", borderRadius: 6, cursor: "pointer", border: "none", background: total === seconds ? T.t1 : T.bg3, color: total === seconds ? T.bg : T.t3, fontWeight: total === seconds ? 600 : 400, transition: "all 0.15s" }}
+                style={{ fontSize: 13, padding: "4px 10px", borderRadius: 999, cursor: "pointer", border: `1px solid ${total === seconds ? `${T.t1}33` : T.border}`, background: total === seconds ? T.t1 : T.bg3, color: total === seconds ? T.bg : T.t3, fontWeight: total === seconds ? 700 : 500, transition: "all 0.15s" }}
               >
                 {seconds}s
               </button>

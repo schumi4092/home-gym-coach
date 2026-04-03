@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DEFAULT_PROGRAM, STORAGE_KEYS, TRAINING_FLOW } from "./constants/defaults.js";
-import { T } from "./constants/theme.js";
+import { T, panelStyle, pillButtonBaseStyle, softChipStyle, statCardStyle } from "./constants/theme.js";
 import { storage, persistLiveWorkout, clearLiveWorkout } from "./storage/index.js";
-import { calcAvgRpe, formatLocalDate, getRpeColor } from "./utils/format.js";
-import { buildExerciseHistoryMap } from "./utils/coaching.js";
+import { calcAvgRpe, formatLocalDate, getDaysSinceLocalDate, getRpeColor } from "./utils/format.js";
+import { buildExerciseHistoryMap, checkDeloadSuggestion } from "./utils/coaching.js";
+import { buildDashboardStats } from "./utils/dashboard.js";
 import { exportToMarkdown, exportBackup, importBackup } from "./utils/export.js";
-import { createWorkoutSession, normalizeWorkoutSession, getNextProgramId, getRecoveryText } from "./utils/workout.js";
+import { normalizeHistory } from "./utils/history.js";
+import { createWorkoutSession, normalizeWorkoutSession } from "./utils/workout.js";
 import { ExerciseCard } from "./components/ExerciseCard.jsx";
 import { ProgressView } from "./views/ProgressView.jsx";
 import { HistoryEditor } from "./views/HistoryEditor.jsx";
@@ -18,7 +20,7 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [programs, setPrograms] = useState(DEFAULT_PROGRAM);
   const [loading, setLoading] = useState(true);
-  const [todayKey] = useState(() => formatLocalDate());
+  const [today] = useState(() => new Date());
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   const [editingHistoryIndex, setEditingHistoryIndex] = useState(null);
   const [exportCopied, setExportCopied] = useState(false);
@@ -31,14 +33,21 @@ export default function App() {
     async function loadData() {
       try {
         const storedPrograms = await storage.get(STORAGE_KEYS.program);
-        if (!cancelled && storedPrograms) setPrograms(JSON.parse(storedPrograms.value));
+        if (!cancelled && storedPrograms) {
+          const parsedPrograms = JSON.parse(storedPrograms.value);
+          if (Array.isArray(parsedPrograms) && parsedPrograms.length > 0) {
+            setPrograms(parsedPrograms);
+          }
+        }
       } catch (error) {
         console.error("Failed to load programs", error);
       }
 
       try {
         const storedHistory = await storage.get(STORAGE_KEYS.history);
-        if (!cancelled && storedHistory) setHistory(JSON.parse(storedHistory.value));
+        if (!cancelled && storedHistory) {
+          setHistory(normalizeHistory(JSON.parse(storedHistory.value)));
+        }
       } catch (error) {
         console.error("Failed to load history", error);
       }
@@ -147,7 +156,7 @@ export default function App() {
       })),
     };
 
-    const nextHistory = [entry, ...history].slice(0, 100);
+    const nextHistory = normalizeHistory([entry, ...history]);
     setHistory(nextHistory);
 
     try {
@@ -192,7 +201,9 @@ export default function App() {
         rpe: exercise.rpe,
       })),
     };
-    const nextHistory = history.map((entry, index) => (index === indexToSave ? cleanedEntry : entry));
+    const nextHistory = normalizeHistory(
+      history.map((entry, index) => (index === indexToSave ? cleanedEntry : entry)),
+    );
     setHistory(nextHistory);
 
     try {
@@ -220,11 +231,21 @@ export default function App() {
   }, []);
 
   const exerciseHistoryMap = useMemo(() => buildExerciseHistoryMap(history), [history]);
+  const deloadSuggestion = useMemo(() => checkDeloadSuggestion(history), [history]);
+  const dashboardStats = useMemo(
+    () => buildDashboardStats(history, programs, today),
+    [history, programs, today],
+  );
   const isDesktop = viewportWidth >= 1024;
-  const shellStyle = { background: T.bg, minHeight: "100vh", padding: isDesktop ? "28px 28px 40px" : "20px 16px", color: T.t1 };
+  const shellStyle = {
+    background: `radial-gradient(circle at top right, ${T.accent}08, transparent 22%), ${T.bg}`,
+    minHeight: "100vh",
+    padding: isDesktop ? "28px 28px 40px" : "20px 16px",
+    color: T.t1,
+  };
 
   if (loading) {
-    return <div style={{ background: T.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: T.t3 }}>載入中...</div>;
+    return <div style={{ background: T.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: T.t3 }}>頛銝?..</div>;
   }
 
   if (view === "progress") {
@@ -260,7 +281,7 @@ export default function App() {
 
   if (view === "workout" && workoutSession) {
     const canDiscard = hasAnyInput && completedExercises !== totalExercises;
-    const finishLabel = !hasAnyInput ? "取消" : completedExercises === totalExercises ? "完成訓練" : "先存紀錄";
+    const finishLabel = !hasAnyInput ? "取消" : completedExercises === totalExercises ? "完成訓練" : "先結束本次";
 
     return (
       <div style={shellStyle}>
@@ -269,7 +290,7 @@ export default function App() {
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: T.accent, letterSpacing: "0.12em", marginBottom: 6 }}>{workoutSession.tag}</div>
               <div style={{ fontSize: 24, fontWeight: 600, color: T.t1, lineHeight: 1.1 }}>{workoutSession.day}</div>
-              <div style={{ fontSize: 15, color: T.t3, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>{completedExercises} / {totalExercises} 已完成</div>
+              <div style={{ fontSize: 15, color: T.t3, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>{completedExercises} / {totalExercises} 個動作完成</div>
             </div>
             <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
               {canDiscard && (
@@ -286,14 +307,14 @@ export default function App() {
 
           <div style={{ background: T.bg2, borderRadius: 8, padding: "8px 12px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ width: 6, height: 6, borderRadius: 3, background: T.green, animation: "pulse 2s infinite" }} />
-            <span style={{ fontSize: 13, color: T.t3 }}>輸入會自動保存，下次打開可以接著做。</span>
+            <span style={{ fontSize: 13, color: T.t3 }}>訓練會自動儲存，你可以慢慢記錄，不用擔心中途離開。</span>
           </div>
 
           <div style={{ height: 2, background: T.bg3, borderRadius: 1, marginBottom: 20, overflow: "hidden" }}>
             <div style={{ height: "100%", borderRadius: 1, transition: "width 0.4s cubic-bezier(.4,0,.2,1)", width: `${totalExercises > 0 ? (completedExercises / totalExercises) * 100 : 0}%`, background: T.accent }} />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr", gap: 10, alignItems: "start" }}>
             {workoutSession.exercises.map((exercise, index) => (
               <ExerciseCard
                 key={`${exercise.name}-${index}`}
@@ -314,34 +335,21 @@ export default function App() {
   }
 
   // Home view
-  const nextProgramId = getNextProgramId(history);
-  const nextProgram = programs.find((program) => program.id === nextProgramId) ?? programs[0];
-  const recentEntry = history[0] ?? null;
-  const lastSameProgram = history.find((entry) => entry.dayId === nextProgramId) ?? null;
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-  const weeklyEntries = history.filter((entry) => new Date(entry.date) >= sevenDaysAgo);
-  const weeklySessions = weeklyEntries.length;
-  const weeklyMinutes = weeklyEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0);
-  const weeklySets = weeklyEntries.reduce((sum, entry) => sum + entry.exercises.reduce((exerciseSum, exercise) => exerciseSum + exercise.reps.filter((rep) => rep > 0).length, 0), 0);
-  const recentAvgRpe = recentEntry ? calcAvgRpe(recentEntry.exercises.flatMap((exercise) => exercise.rpe || [])) : 0;
-  const currentDayTime = new Date(todayKey).getTime();
-  const lastSameProgramDate = lastSameProgram ? Math.max(0, Math.floor((currentDayTime - new Date(lastSameProgram.date).getTime()) / 86400000)) : null;
-  const estimatedMinutes = Math.max(25, nextProgram.exercises.length * 7);
-  const bestSet = history
-    .flatMap((entry) => entry.exercises.map((exercise) => ({
-      day: entry.day,
-      name: exercise.name,
-      weight: exercise.weight,
-      reps: Math.max(...exercise.reps, 0),
-      score: (exercise.weight || 0) * Math.max(...exercise.reps, 0),
-      unit: exercise.unit,
-    })))
-    .sort((left, right) => right.score - left.score)[0] ?? null;
-  const upperRecovery = history.find((entry) => entry.dayId?.includes("upper"));
-  const lowerRecovery = history.find((entry) => entry.dayId?.includes("lower"));
-  const upperRecoveryState = getRecoveryText(upperRecovery, currentDayTime);
-  const lowerRecoveryState = getRecoveryText(lowerRecovery, currentDayTime);
+  const {
+    nextProgramId,
+    nextProgram,
+    recentEntry,
+    lastSameProgram,
+    weeklySessions,
+    weeklyMinutes,
+    weeklySets,
+    recentAvgRpe,
+    lastSameProgramDate,
+    estimatedMinutes,
+    bestSet,
+    upperRecoveryState,
+    lowerRecoveryState,
+  } = dashboardStats;
 
   return (
     <div style={shellStyle}>
@@ -349,44 +357,44 @@ export default function App() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: T.accent, letterSpacing: "0.12em", marginBottom: 6 }}>HOME GYM</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: T.t1, lineHeight: 1.1 }}>居家訓練計畫</div>
+            <div style={{ fontSize: 28, fontWeight: 600, color: T.t1, lineHeight: 1.1 }}>撅振閮毀閮</div>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button onClick={() => setView("edit-program")} style={{ fontSize: 14, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, border: "none", background: T.bg3, color: T.t1 }}>
-              編輯課表
+            <button onClick={() => setView("edit-program")} style={{ ...pillButtonBaseStyle, color: T.t1 }}>
+              蝺刻摩隤脰”
             </button>
             {history.length > 0 && (
               <>
-                <button onClick={() => setView("progress")} style={{ fontSize: 14, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, border: "none", background: T.bg3, color: T.accent, display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => setView("progress")} style={{ ...pillButtonBaseStyle, color: T.accent, display: "flex", alignItems: "center", gap: 6 }}>
                   <svg width="14" height="14" viewBox="0 0 14 14">
                     <path d="M2 10L5 6L8 8L12 3" fill="none" stroke={T.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  進度追蹤
+                  ?脣漲餈質馱
                 </button>
                 <button
                   onClick={async () => {
-                    const md = exportToMarkdown(history, programs);
+                    const md = exportToMarkdown(history);
                     await navigator.clipboard.writeText(md);
                     setExportCopied(true);
                     setTimeout(() => setExportCopied(false), 2000);
                   }}
-                  style={{ fontSize: 14, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, border: "none", background: exportCopied ? T.green : T.bg3, color: exportCopied ? T.bg : T.t2, display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s" }}
+                  style={{ ...pillButtonBaseStyle, background: exportCopied ? T.green : T.bg3, color: exportCopied ? T.bg : T.t2, display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s", borderColor: exportCopied ? `${T.green}44` : T.border }}
                 >
-                  {exportCopied ? "✓ 已複製" : "匯出報告"}
+                  {exportCopied ? "已複製 Markdown" : "匯出 Markdown"}
                 </button>
                 <button
                   onClick={() => exportBackup(history, programs)}
-                  style={{ fontSize: 14, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, border: "none", background: T.bg3, color: T.t2, display: "flex", alignItems: "center", gap: 6 }}
+                  style={{ ...pillButtonBaseStyle, display: "flex", alignItems: "center", gap: 6 }}
                 >
-                  備份
+                  匯出備份
                 </button>
               </>
             )}
             <button
               onClick={() => importRef.current?.click()}
-              style={{ fontSize: 14, padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, border: "none", background: importStatus === "ok" ? T.green : importStatus === "error" ? T.red : T.bg3, color: importStatus === "ok" ? T.bg : T.t2, transition: "all 0.2s" }}
+              style={{ ...pillButtonBaseStyle, background: importStatus === "ok" ? T.green : importStatus === "error" ? T.red : T.bg3, color: importStatus === "ok" ? T.bg : T.t2, transition: "all 0.2s", borderColor: importStatus === "ok" ? `${T.green}44` : importStatus === "error" ? `${T.red}44` : T.border }}
             >
-              {importStatus === "ok" ? "✓ 匯入成功" : importStatus === "error" ? "✗ 格式錯誤" : "匯入備份"}
+              {importStatus === "ok" ? "匯入成功" : importStatus === "error" ? "匯入失敗" : "匯入備份"}
             </button>
             <input
               ref={importRef}
@@ -417,41 +425,41 @@ export default function App() {
                 <div style={{ fontSize: 12, fontWeight: 700, color: T.accent, letterSpacing: "0.12em", marginBottom: 8 }}>NEXT SESSION</div>
                 <div style={{ fontSize: 26, fontWeight: 700, color: T.t1, lineHeight: 1.1, marginBottom: 6 }}>{nextProgram.day}</div>
                 <div style={{ fontSize: 15, color: T.t2, lineHeight: 1.5 }}>
-                  {nextProgram.subtitle}，{nextProgram.exercises.length} 個動作，預估 {estimatedMinutes} 分鐘
+                  {nextProgram.subtitle}，共 {nextProgram.exercises.length} 個動作，預估 {estimatedMinutes} 分鐘
                 </div>
               </div>
-              <div style={{ padding: "8px 10px", borderRadius: 999, background: `${T.accent}18`, color: T.accent, fontSize: 13, fontWeight: 700 }}>
+              <div style={{ ...softChipStyle, background: `${T.accent}18`, color: T.accent }}>
                 {nextProgram.tag}
               </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
               <div style={{ background: "rgba(17,17,16,0.34)", borderRadius: 12, padding: "12px 12px" }}>
-                <div style={{ fontSize: 12, color: T.t3, marginBottom: 5 }}>上次做這堂</div>
+                <div style={{ fontSize: 12, color: T.t3, marginBottom: 5 }}>上次同課表</div>
                 <div style={{ fontSize: 16, color: T.t1, fontWeight: 600 }}>
                   {lastSameProgram ? `${lastSameProgram.date}` : "還沒有紀錄"}
                 </div>
                 <div style={{ fontSize: 13, color: T.t3, marginTop: 4 }}>
-                  {lastSameProgramDate === null ? "從這堂開始建立資料" : `${lastSameProgramDate} 天前`}
+                  {lastSameProgramDate === null ? "這會是第一次做這組課表" : `${lastSameProgramDate} 天前`}
                 </div>
               </div>
               <div style={{ background: "rgba(17,17,16,0.34)", borderRadius: 12, padding: "12px 12px" }}>
-                <div style={{ fontSize: 12, color: T.t3, marginBottom: 5 }}>最近一次狀態</div>
+                <div style={{ fontSize: 12, color: T.t3, marginBottom: 5 }}>最近一次訓練</div>
                 <div style={{ fontSize: 16, color: T.t1, fontWeight: 600 }}>
-                  {recentEntry ? `${recentEntry.day}` : "還沒有訓練紀錄"}
+                  {recentEntry ? `${recentEntry.day}` : "還沒有最近紀錄"}
                 </div>
                 <div style={{ fontSize: 13, color: recentAvgRpe > 0 ? getRpeColor(recentAvgRpe) : T.t3, marginTop: 4 }}>
-                  {recentAvgRpe > 0 ? `平均 RPE ${recentAvgRpe}` : "做完後會顯示摘要"}
+                  {recentAvgRpe > 0 ? `平均 RPE ${recentAvgRpe}` : "完成一次訓練後會顯示這裡"}
                 </div>
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button onClick={() => startWorkout(nextProgram.id)} style={{ flex: 1, minWidth: 180, fontSize: 16, padding: "12px 18px", borderRadius: 10, border: "none", cursor: "pointer", background: T.accent, color: T.bg, fontWeight: 700 }}>
-                開始下一次訓練
+                開始今天訓練
               </button>
               <button onClick={() => setView("progress")} style={{ fontSize: 15, padding: "12px 16px", borderRadius: 10, border: `1px solid ${T.borderLight}`, cursor: "pointer", background: "rgba(17,17,16,0.28)", color: T.t1, fontWeight: 600 }}>
-                查看進度
+                ?亦??脣漲
               </button>
             </div>
           </div>
@@ -459,11 +467,23 @@ export default function App() {
 
         <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(3, minmax(0, 1fr))" : "repeat(3,1fr)", gap: 8, marginBottom: 16 }}>
           {[
-            { label: "近 7 天訓練", value: `${weeklySessions} 次`, sub: weeklySessions > 0 ? `${weeklyMinutes} 分鐘` : "還沒開始" },
-            { label: "完成組數", value: `${weeklySets} 組`, sub: "最近 7 天" },
-            { label: "最佳表現", value: bestSet ? `${bestSet.weight > 0 ? `${bestSet.weight}${bestSet.unit}` : "BW"} x ${bestSet.reps}` : "-", sub: bestSet ? bestSet.name : "尚無資料" },
+            {
+              label: "最近 7 天訓練",
+              value: `${weeklySessions} 次`,
+              sub: weeklySessions > 0 ? `${weeklyMinutes} 分鐘` : "還沒有訓練",
+            },
+            {
+              label: "完成組數",
+              value: `${weeklySets} 組`,
+              sub: "最近 7 天累積",
+            },
+            {
+              label: "最佳表現",
+              value: bestSet ? `${bestSet.weight > 0 ? `${bestSet.weight}${bestSet.unit}` : "BW"} x ${bestSet.reps}` : "-",
+              sub: bestSet ? bestSet.name : "還沒有紀錄",
+            },
           ].map((card) => (
-            <div key={card.label} style={{ background: T.bg2, borderRadius: 16, padding: "16px 14px", border: `1px solid ${T.border}` }}>
+            <div key={card.label} style={{ ...statCardStyle, borderRadius: 16, padding: "16px 14px" }}>
               <div style={{ fontSize: 12, color: T.t3, marginBottom: 7 }}>{card.label}</div>
               <div style={{ fontSize: 22, color: T.t1, fontWeight: 700, lineHeight: 1.1, marginBottom: 5 }}>{card.value}</div>
               <div style={{ fontSize: 12, color: T.t3 }}>{card.sub}</div>
@@ -471,35 +491,44 @@ export default function App() {
           ))}
         </div>
 
+        {deloadSuggestion && (
+          <div style={{ background: deloadSuggestion.level === "warning" ? `${T.red}18` : `${T.amber}18`, border: `1px solid ${deloadSuggestion.level === "warning" ? `${T.red}44` : `${T.amber}44`}`, borderRadius: 14, padding: "16px 18px", marginBottom: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: deloadSuggestion.level === "warning" ? T.red : T.amber, marginBottom: 6 }}>
+              {deloadSuggestion.headline}
+            </div>
+            <div style={{ fontSize: 14, color: T.t2, lineHeight: 1.5 }}>{deloadSuggestion.detail}</div>
+          </div>
+        )}
+
         <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 24 }}>
-          <div style={{ background: T.bg2, borderRadius: 14, padding: "14px 14px", border: `1px solid ${T.border}` }}>
+          <div style={{ ...panelStyle, borderRadius: 14, padding: "14px 14px" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, letterSpacing: "0.1em", marginBottom: 10 }}>恢復狀態</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <span style={{ fontSize: 15, color: T.t1 }}>上半身</span>
+              <span style={{ fontSize: 15, color: T.t1 }}>上肢</span>
               <span style={{ fontSize: 14, color: upperRecoveryState.color, fontWeight: 700 }}>{upperRecoveryState.label}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 15, color: T.t1 }}>下半身</span>
+              <span style={{ fontSize: 15, color: T.t1 }}>下肢</span>
               <span style={{ fontSize: 14, color: lowerRecoveryState.color, fontWeight: 700 }}>{lowerRecoveryState.label}</span>
             </div>
           </div>
 
-          <div style={{ background: T.bg2, borderRadius: 14, padding: "14px 14px", border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, letterSpacing: "0.1em", marginBottom: 10 }}>最近亮點</div>
+          <div style={{ ...panelStyle, borderRadius: 14, padding: "14px 14px" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, letterSpacing: "0.1em", marginBottom: 10 }}>最近最佳表現</div>
             <div style={{ fontSize: 16, color: T.t1, fontWeight: 600, lineHeight: 1.4 }}>
-              {bestSet ? `${bestSet.name} 做到 ${bestSet.weight > 0 ? `${bestSet.weight}${bestSet.unit}` : "BW"} x ${bestSet.reps}` : "先完成第一堂，這裡會出現你的最佳表現。"}
+              {bestSet ? `${bestSet.name} 使用 ${bestSet.weight > 0 ? `${bestSet.weight}${bestSet.unit}` : "BW"} x ${bestSet.reps}` : "完成幾次訓練後，這裡會顯示你的最佳表現"}
             </div>
             {bestSet && <div style={{ fontSize: 13, color: T.t3, marginTop: 6 }}>{bestSet.day}</div>}
           </div>
         </div>
 
-        <div style={{ fontSize: 13, fontWeight: 600, color: T.t3, letterSpacing: "0.08em", marginBottom: 14 }}>訓練順序</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.t3, letterSpacing: "0.08em", marginBottom: 14 }}>訓練流程</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 5, marginBottom: 32 }}>
           {TRAINING_FLOW.map((day, index) => {
             const isRest = day.type === "rest";
             const isNext = day.type === nextProgramId;
             const lastDone = !isRest ? history.find((entry) => entry.dayId === day.type) : null;
-            const daysAgo = lastDone ? Math.floor((currentDayTime - new Date(lastDone.date).getTime()) / 86400000) : null;
+            const daysAgo = lastDone ? getDaysSinceLocalDate(lastDone.date, today) : null;
 
             return (
               <div
@@ -511,7 +540,7 @@ export default function App() {
                 <div style={{ fontSize: 14, fontWeight: isRest ? 400 : 600, color: isNext ? T.bg : isRest ? T.t3 : T.t1 }}>{day.short}</div>
                 {!isRest && (
                   <div style={{ fontSize: 11, marginTop: 4, color: isNext ? `${T.bg}99` : T.t3 }}>
-                    {daysAgo === null ? "未做過" : daysAgo === 0 ? "今天" : `${daysAgo}天前`}
+                    {daysAgo === null ? "未做過" : daysAgo === 0 ? "今天" : `${daysAgo} 天前`}
                   </div>
                 )}
               </div>
@@ -547,7 +576,7 @@ export default function App() {
                 const completedCount = entry.exercises.filter((exercise) => exercise.reps.some((rep) => rep > 0)).length;
 
                 return (
-                  <div key={`${entry.date}-${index}`} style={{ display: "flex", alignItems: "center", padding: "14px 16px", gap: 12, background: T.bg2, borderRadius: 10, marginBottom: isDesktop ? 0 : 5 }}>
+                  <div key={`${entry.date}-${index}`} style={{ ...panelStyle, display: "flex", alignItems: "center", padding: "14px 16px", gap: 12, marginBottom: isDesktop ? 0 : 5 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, background: T.bg3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: T.accent }}>
                       {entry.dayId?.includes("upper") ? "U" : "L"}
                     </div>
@@ -562,13 +591,13 @@ export default function App() {
                       <div style={{ fontSize: 14, color: T.t2, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{completedCount}/{entry.exercises.length}</div>
                       <button
                         onClick={() => { setEditingHistoryIndex(index); setView("edit-history"); }}
-                        style={{ fontSize: 13, padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", background: T.bg3, color: T.accent }}
+                        style={{ ...pillButtonBaseStyle, fontSize: 13, padding: "4px 10px", color: T.accent }}
                       >
                         編輯
                       </button>
                       <button
                         onClick={() => void deleteHistoryEntry(index)}
-                        style={{ fontSize: 13, padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer", background: T.bg3, color: T.red }}
+                        style={{ ...pillButtonBaseStyle, fontSize: 13, padding: "4px 10px", color: T.red }}
                       >
                         刪除
                       </button>

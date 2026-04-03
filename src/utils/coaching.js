@@ -1,4 +1,4 @@
-import { calcAvgRpe, parseRepRange, formatExerciseLoad } from "./format.js";
+import { calcAvgRpe, parseRepRange, formatExerciseLoad, isLocalDateWithinDays } from "./format.js";
 import { getDefaultStep } from "./workout.js";
 
 export function buildExerciseHistoryMap(history) {
@@ -42,6 +42,58 @@ export function buildExerciseHistoryMap(history) {
   }
 
   return map;
+}
+
+export function checkDeloadSuggestion(history) {
+  const recentEntries = history.filter((entry) => isLocalDateWithinDays(entry.date, 21));
+  if (recentEntries.length < 4) return null;
+
+  const recentRpes = recentEntries.map((entry) =>
+    calcAvgRpe(entry.exercises.flatMap((ex) => ex.rpe || [])),
+  ).filter((rpe) => rpe > 0);
+
+  if (recentRpes.length < 4) return null;
+
+  const avgRpe = Math.round((recentRpes.reduce((s, v) => s + v, 0) / recentRpes.length) * 10) / 10;
+  const highRpeCount = recentRpes.filter((rpe) => rpe >= 9).length;
+  const highRpeRatio = highRpeCount / recentRpes.length;
+
+  const repDecline = checkRepDecline(history);
+
+  if (avgRpe >= 9 && highRpeRatio >= 0.6) {
+    return {
+      level: "warning",
+      headline: "建議安排減量週",
+      detail: `最近 ${recentRpes.length} 次訓練平均 RPE ${avgRpe}，其中 ${highRpeCount} 次 RPE ≥ 9。建議下週將重量降 10-15%、減少 1-2 組，讓身體恢復。`,
+    };
+  }
+
+  if (avgRpe >= 8.5 && (highRpeRatio >= 0.5 || repDecline)) {
+    return {
+      level: "caution",
+      headline: "疲勞累積中",
+      detail: `近期平均 RPE ${avgRpe}${repDecline ? "，部分動作次數有下滑趨勢" : ""}。可以考慮稍微降低強度或多安排一天休息。`,
+    };
+  }
+
+  return null;
+}
+
+function checkRepDecline(history) {
+  if (history.length < 4) return false;
+
+  const recent = history.slice(0, 2);
+  const earlier = history.slice(2, 4);
+
+  const avgReps = (entries) => {
+    const allReps = entries.flatMap((e) => e.exercises.flatMap((ex) => ex.reps.filter((r) => r > 0)));
+    return allReps.length > 0 ? allReps.reduce((s, v) => s + v, 0) / allReps.length : 0;
+  };
+
+  const recentAvg = avgReps(recent);
+  const earlierAvg = avgReps(earlier);
+
+  return earlierAvg > 0 && recentAvg < earlierAvg * 0.85;
 }
 
 export function createCoachingHint(exercise, latestHint, bestHint) {

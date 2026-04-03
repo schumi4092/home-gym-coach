@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { T } from "../constants/theme.js";
+import { T, iconButtonStyle, inputBaseStyle, panelStyle, primaryButtonStyle } from "../constants/theme.js";
 
 export function ProgramEditor({ programs, onBack, onSave, isDesktop }) {
   const [draft, setDraft] = useState(() => JSON.parse(JSON.stringify(programs)));
@@ -55,7 +55,7 @@ export function ProgramEditor({ programs, onBack, onSave, isDesktop }) {
       <div style={{ maxWidth: isDesktop ? 1200 : 700, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button onClick={onBack} style={{ width: 36, height: 36, borderRadius: 10, background: T.bg3, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <button onClick={onBack} style={iconButtonStyle}>
               <svg width="14" height="14" viewBox="0 0 14 14">
                 <path d="M9 2L4 7L9 12" fill="none" stroke={T.t2} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -66,7 +66,7 @@ export function ProgramEditor({ programs, onBack, onSave, isDesktop }) {
               <div style={{ fontSize: 14, color: T.t3, marginTop: 4 }}>可以修改動作、刪除動作，或新增新的動作。</div>
             </div>
           </div>
-          <button onClick={() => onSave(cleanedPrograms)} style={{ fontSize: 15, padding: "10px 18px", borderRadius: 10, border: "none", cursor: "pointer", background: T.accent, color: T.bg, fontWeight: 700 }}>
+          <button onClick={() => onSave(cleanedPrograms)} style={primaryButtonStyle}>
             儲存課表
           </button>
         </div>
@@ -74,7 +74,7 @@ export function ProgramEditor({ programs, onBack, onSave, isDesktop }) {
         <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "280px minmax(0,1fr)" : "1fr", gap: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {draft.map((program) => (
-              <button key={program.id} onClick={() => setSelectedId(program.id)} style={{ textAlign: "left", padding: "14px 14px", borderRadius: 12, border: `1px solid ${selectedId === program.id ? `${T.accent}70` : T.border}`, background: selectedId === program.id ? `${T.accent}14` : T.bg2, color: T.t1, cursor: "pointer" }}>
+              <button key={program.id} onClick={() => setSelectedId(program.id)} style={{ ...panelStyle, textAlign: "left", padding: "14px 14px", borderColor: selectedId === program.id ? `${T.accent}70` : T.border, background: selectedId === program.id ? `${T.accent}14` : T.bg2, color: T.t1, cursor: "pointer" }}>
                 <div style={{ fontSize: 12, color: T.accent, fontWeight: 700, letterSpacing: "0.12em", marginBottom: 6 }}>{program.tag}</div>
                 <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{program.day}</div>
                 <div style={{ fontSize: 14, color: T.t3 }}>{program.exercises.length} 個動作</div>
@@ -83,11 +83,11 @@ export function ProgramEditor({ programs, onBack, onSave, isDesktop }) {
           </div>
 
           {selectedProgram && (
-            <div style={{ background: T.bg2, borderRadius: 16, border: `1px solid ${T.border}`, padding: "16px 16px" }}>
+            <div style={{ ...panelStyle, borderRadius: 16, padding: "16px 16px" }}>
               <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 120px" : "1fr", gap: 10, marginBottom: 16 }}>
-                <input value={selectedProgram.day} onChange={(event) => updateProgramField(selectedProgram.id, "day", event.target.value)} style={{ height: 40, borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg3, color: T.t1, padding: "0 12px" }} />
-                <input value={selectedProgram.subtitle} onChange={(event) => updateProgramField(selectedProgram.id, "subtitle", event.target.value)} style={{ height: 40, borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg3, color: T.t1, padding: "0 12px" }} />
-                <input value={selectedProgram.tag} onChange={(event) => updateProgramField(selectedProgram.id, "tag", event.target.value)} style={{ height: 40, borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg3, color: T.t1, padding: "0 12px" }} />
+                <input value={selectedProgram.day} onChange={(event) => updateProgramField(selectedProgram.id, "day", event.target.value)} style={inputBaseStyle} />
+                <input value={selectedProgram.subtitle} onChange={(event) => updateProgramField(selectedProgram.id, "subtitle", event.target.value)} style={inputBaseStyle} />
+                <input value={selectedProgram.tag} onChange={(event) => updateProgramField(selectedProgram.id, "tag", event.target.value)} style={inputBaseStyle} />
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>

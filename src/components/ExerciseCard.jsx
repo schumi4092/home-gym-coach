@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { T } from "../constants/theme.js";
+import { T, panelStyle, pillButtonBaseStyle } from "../constants/theme.js";
 import { calcAvgRpe, formatExerciseLoad, getRpeColor } from "../utils/format.js";
 import { getAdjustedWeight, getDefaultStep, getRestSeconds } from "../utils/workout.js";
 import { createCoachingHint } from "../utils/coaching.js";
@@ -21,9 +21,9 @@ export function ExerciseCard({ exercise, index, onRep, onWeight, onRpe, onStepCh
   const coachingHint = createCoachingHint(exercise, latestHint, bestHint);
 
   return (
-    <div style={{ borderRadius: 12, marginBottom: 6, overflow: "hidden", transition: "all 0.2s", background: open ? T.bg2 : "transparent", border: `0.5px solid ${open ? T.borderLight : "transparent"}` }}>
+    <div style={{ ...panelStyle, borderRadius: 16, marginBottom: 8, overflow: "hidden", transition: "all 0.2s", background: open ? T.bg2 : T.bg5, borderColor: open ? T.borderLight : T.border, alignSelf: "start" }}>
       <div onClick={() => setOpen((current) => !current)} style={{ padding: "16px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, userSelect: "none" }}>
-        <div style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0, background: allDone ? T.accent : T.bg3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: allDone ? T.bg : T.t3, transition: "all 0.3s" }}>
+        <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: allDone ? T.accent : T.bg3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: allDone ? T.bg : T.t3, transition: "all 0.3s", border: `1px solid ${allDone ? `${T.accent}66` : T.border}` }}>
           {allDone ? (
             <svg width="14" height="14" viewBox="0 0 14 14">
               <path d="M2.5 7.5L5.5 10.5L11.5 3.5" fill="none" stroke={T.bg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -32,7 +32,7 @@ export function ExerciseCard({ exercise, index, onRep, onWeight, onRpe, onStepCh
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: T.t1, lineHeight: 1.3 }}>{exercise.name}</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: T.t1, lineHeight: 1.3 }}>{exercise.name}</div>
           <div style={{ fontSize: 14, color: T.t3, marginTop: 2, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ color: T.t2, fontWeight: 500 }}>{exercise.weight > 0 ? `${exercise.weight} ${exercise.unit}` : "自體重"}</span>
             <span style={{ opacity: 0.3 }}>|</span>
@@ -55,7 +55,7 @@ export function ExerciseCard({ exercise, index, onRep, onWeight, onRpe, onStepCh
 
       {open && (
         <div style={{ padding: "0 14px 14px" }}>
-          <div style={{ fontSize: 14, color: T.t1, padding: "10px 12px", lineHeight: 1.6, background: T.bg3, borderRadius: 8, marginBottom: 12, borderLeft: `2px solid ${T.accent}` }}>
+          <div style={{ fontSize: 14, color: T.t1, padding: "12px 12px", lineHeight: 1.6, background: T.bg3, borderRadius: 10, marginBottom: 12, borderLeft: `2px solid ${T.accent}` }}>
             <div style={{ color: T.t3, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>LAST TIME</div>
             <div>{dynamicHint}</div>
             {(bestHintText || latestHint?.avgRpe > 0) && (
@@ -64,7 +64,7 @@ export function ExerciseCard({ exercise, index, onRep, onWeight, onRpe, onStepCh
                 {latestHint?.avgRpe > 0 && <div style={{ color: getRpeColor(latestHint.avgRpe) }}>平均 RPE {latestHint.avgRpe}</div>}
               </div>
             )}
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` }}>
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
               <div style={{ color: T.t3, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>NEXT TIP</div>
               <div style={{ color: T.accent, fontWeight: 700, marginBottom: 4 }}>{coachingHint.headline}</div>
               <div style={{ color: T.t2 }}>{coachingHint.detail}</div>
@@ -72,7 +72,7 @@ export function ExerciseCard({ exercise, index, onRep, onWeight, onRpe, onStepCh
           </div>
 
           {exercise.note && (
-            <div style={{ fontSize: 14, color: T.t2, padding: "10px 12px", lineHeight: 1.6, background: T.bg3, borderRadius: 8, marginBottom: 12, borderLeft: `2px solid ${T.accent}40` }}>
+            <div style={{ fontSize: 14, color: T.t2, padding: "12px 12px", lineHeight: 1.6, background: T.bg3, borderRadius: 10, marginBottom: 12, borderLeft: `2px solid ${T.accent}40` }}>
               <div style={{ color: T.t3, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>COACH NOTE</div>
               {exercise.note}
             </div>
@@ -81,11 +81,11 @@ export function ExerciseCard({ exercise, index, onRep, onWeight, onRpe, onStepCh
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: 13, color: T.t3, fontWeight: 500 }}>重量</span>
             <div style={{ display: "inline-flex", alignItems: "center", borderRadius: 8, overflow: "hidden", border: `0.5px solid ${T.border}` }}>
-              <button onClick={() => onWeight(index, getAdjustedWeight(exercise.weight, exercise.step ?? getDefaultStep(exercise.unit), -1))} style={{ width: 32, height: 30, border: "none", background: T.bg3, color: T.t2, fontSize: 17, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
+              <button onClick={() => onWeight(index, getAdjustedWeight(exercise.weight, exercise.step ?? getDefaultStep(exercise.unit), -1))} style={{ ...pillButtonBaseStyle, width: 32, height: 30, padding: 0, borderRadius: 8, border: "none", background: T.bg3, color: T.t2, fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
               <div style={{ minWidth: 56, height: 30, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: T.t1, background: T.bg2, padding: "0 4px" }}>
                 {exercise.weight > 0 ? `${exercise.weight} ${exercise.unit}` : "BW"}
               </div>
-              <button onClick={() => onWeight(index, getAdjustedWeight(exercise.weight, exercise.step ?? getDefaultStep(exercise.unit), 1))} style={{ width: 32, height: 30, border: "none", background: T.bg3, color: T.t2, fontSize: 17, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+              <button onClick={() => onWeight(index, getAdjustedWeight(exercise.weight, exercise.step ?? getDefaultStep(exercise.unit), 1))} style={{ ...pillButtonBaseStyle, width: 32, height: 30, padding: 0, borderRadius: 8, border: "none", background: T.bg3, color: T.t2, fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
             </div>
             {exercise.unit === "kg" && (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
