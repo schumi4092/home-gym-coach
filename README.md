@@ -12,8 +12,8 @@
 
 ### 紀錄
 - 4 天課表循環（上半身 A/B、下半身 A/B），所有動作可自由編輯
-- 訓練中即時記錄每組次數與 RPE，+/- 步進按鈕取代滑桿
-- **熱身組切換**：每組可標記為 W (warm-up)，不計入訓練量、PR、RPE 與趨勢
+- **三種方式登錄 reps**：+/− 步進、直接點數字輸入、以及排版式 quick-pick（依目標 rep range 自動產生）
+- **熱身組**：「+ Warm-up set」加一組（自動置頂且標記 WU），「+ Add set」加一組正式組，「×」移除任一組；熱身組不計入訓練量、PR、RPE 與趨勢
 - **課中動作替換**：訓練中可 swap 任意動作 — 從常用庫選或自訂動作（支援組數/次數/重量/單位）
 - **筆記系統**：每個動作可寫單次訓練筆記；每次 session 有整體筆記欄
 - **休息計時自動起跳**：登錄一組非熱身 reps 時，計時器自動依該動作的休息秒數倒數
@@ -103,7 +103,7 @@ src/
     EditorialHistoryEditor.jsx  # 歷史紀錄編輯
   components/
     EditorialExerciseCard.jsx   # 含 weight stepper + swap + 筆記
-    EditorialSetRow.jsx         # rep stepper + W (warmup) toggle
+    EditorialSetRow.jsx         # rep stepper + click-to-type + typographic quick-pick
     EditorialTimer.jsx          # 休息計時器（autoStartKey 觸發）
   constants/editorial-theme.js  # 色票與樣式預設
   utils/
@@ -147,7 +147,8 @@ Vite dev server 也強制綁在同樣的 `127.0.0.1:8765`（`vite.config.js` 裡
 
 ### v0.3.0
 - 整體 UI 改為編輯風格（奶油紙面 + 墨黑排版，Fraunces + IBM Plex Mono）
-- 新增熱身組切換，熱身組不計入訓練量 / PR / RPE / 趨勢 / coaching hints
+- 熱身組機制：用「+ Warm-up set」與「+ Add set」加組、× 移除，熱身組不計入訓練量 / PR / RPE / 趨勢 / coaching hints
+- Rep 輸入強化：+/− 步進、點大數字直接打字、或從排版式 quick-pick（依目標 rep range 自動產生）選
 - 新增 session note（單次訓練）與 exercise note（單次動作）欄位
 - 休息計時器自動起跳：完成一組有效 reps 時自動倒數
 - 課中動作替換：從常用庫選擇或自訂新動作
