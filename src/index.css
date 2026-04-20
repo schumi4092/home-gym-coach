@@ -1,74 +1,44 @@
+/* Editorial theme — paste into src/index.css (or replace body rules) */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;500;600;700&display=swap');
+
 body {
   margin: 0;
-  font-family: "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-family: "Fraunces", Georgia, "Noto Serif TC", "Songti TC", serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background:
-    radial-gradient(circle at top right, rgba(200, 255, 62, 0.07), transparent 26%),
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 18%),
-    #111110;
-  color: #F0EDE6;
+  background: #EEE8DA;
+  color: #14130F;
 }
 
-#root {
-  min-height: 100vh;
-}
+#root { min-height: 100vh; }
+* { box-sizing: border-box; }
 
-* {
-  box-sizing: border-box;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
+button, input, select, textarea { font: inherit; }
 
 button {
-  transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
-}
-
-button:hover {
-  transform: translateY(-1px);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid rgba(200, 255, 62, 0.55);
+  outline: 2px solid #C8501E;
   outline-offset: 2px;
 }
 
 ::selection {
-  background: rgba(200, 255, 62, 0.22);
-  color: #F0EDE6;
+  background: #F2E27A;
+  color: #14130F;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: #161715;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #2E2E2B;
-  border-radius: 999px;
-  border: 2px solid #161715;
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #E5DFD0; }
+::-webkit-scrollbar-thumb { background: #857F6F; border-radius: 999px; border: 2px solid #E5DFD0; }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  50% { opacity: 0.4; }
 }
 
-.program-card:hover {
-  border-color: #C8FF3E99 !important;
-  transform: translateY(-2px);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
-}
+.ed-row-hover:hover { background: #F5F0E2; }

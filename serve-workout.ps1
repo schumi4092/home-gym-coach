@@ -116,6 +116,9 @@ function Handle-Client {
     $writer.NewLine = "`r`n"
     $writer.WriteLine("HTTP/1.1 $StatusCode $StatusText")
     $writer.WriteLine("Content-Type: $ContentType")
+    $writer.WriteLine("Cache-Control: no-store, no-cache, must-revalidate, max-age=0")
+    $writer.WriteLine("Pragma: no-cache")
+    $writer.WriteLine("Expires: 0")
     $writer.WriteLine("Content-Length: $($Body.Length)")
     $writer.WriteLine("Connection: close")
     $writer.WriteLine()
@@ -261,6 +264,9 @@ try {
         $w.NewLine = "`r`n"
         $w.WriteLine("HTTP/1.1 $code $text")
         $w.WriteLine("Content-Type: $ct")
+        $w.WriteLine("Cache-Control: no-store, no-cache, must-revalidate, max-age=0")
+        $w.WriteLine("Pragma: no-cache")
+        $w.WriteLine("Expires: 0")
         $w.WriteLine("Content-Length: $($body.Length)")
         $w.WriteLine("Connection: close")
         $w.WriteLine()

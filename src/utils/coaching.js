@@ -6,9 +6,10 @@ export function buildExerciseHistoryMap(history) {
 
   for (const entry of history) {
     for (const exercise of entry.exercises) {
-      const completedReps = exercise.reps.filter((rep) => rep > 0);
+      const completedReps = exercise.reps.filter((rep, i) => rep > 0 && !exercise.warmup?.[i]);
       if (completedReps.length === 0) continue;
 
+      const workingRpes = (exercise.rpe || []).filter((_, i) => !exercise.warmup?.[i]);
       const exerciseSummary = {
         date: entry.date,
         weight: exercise.weight,
@@ -16,7 +17,7 @@ export function buildExerciseHistoryMap(history) {
         reps: completedReps,
         maxRep: Math.max(...completedReps),
         totalReps: completedReps.reduce((sum, rep) => sum + rep, 0),
-        avgRpe: calcAvgRpe(exercise.rpe),
+        avgRpe: calcAvgRpe(workingRpes),
       };
 
       if (!map[exercise.name]) {
@@ -49,7 +50,7 @@ export function checkDeloadSuggestion(history) {
   if (recentEntries.length < 4) return null;
 
   const recentRpes = recentEntries.map((entry) =>
-    calcAvgRpe(entry.exercises.flatMap((ex) => ex.rpe || [])),
+    calcAvgRpe(entry.exercises.flatMap((ex) => (ex.rpe || []).filter((_, i) => !ex.warmup?.[i]))),
   ).filter((rpe) => rpe > 0);
 
   if (recentRpes.length < 4) return null;
@@ -86,7 +87,7 @@ function checkRepDecline(history) {
   const earlier = history.slice(2, 4);
 
   const avgReps = (entries) => {
-    const allReps = entries.flatMap((e) => e.exercises.flatMap((ex) => ex.reps.filter((r) => r > 0)));
+    const allReps = entries.flatMap((e) => e.exercises.flatMap((ex) => ex.reps.filter((r, i) => r > 0 && !ex.warmup?.[i])));
     return allReps.length > 0 ? allReps.reduce((s, v) => s + v, 0) / allReps.length : 0;
   };
 

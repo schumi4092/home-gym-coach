@@ -28,12 +28,20 @@ export function getRestSeconds(range) {
 export function normalizeWorkoutSession(session) {
   return {
     ...session,
-    exercises: session.exercises.map((exercise) => ({
-      ...exercise,
-      step: exercise.step ?? getDefaultStep(exercise.unit),
-      reps: exercise.reps ?? new Array(exercise.sets).fill(0),
-      rpe: exercise.rpe ?? new Array(exercise.sets).fill(0),
-    })),
+    sessionNote: session.sessionNote ?? "",
+    exercises: session.exercises.map((exercise) => {
+      const sets = exercise.sets ?? (exercise.reps?.length ?? 1);
+      return {
+        ...exercise,
+        step: exercise.step ?? getDefaultStep(exercise.unit),
+        reps: exercise.reps ?? new Array(sets).fill(0),
+        rpe: exercise.rpe ?? new Array(sets).fill(0),
+        warmup: Array.isArray(exercise.warmup) && exercise.warmup.length === sets
+          ? exercise.warmup
+          : new Array(sets).fill(false),
+        exerciseNote: exercise.exerciseNote ?? "",
+      };
+    }),
   };
 }
 
@@ -41,11 +49,30 @@ export function createWorkoutSession(program) {
   return normalizeWorkoutSession({
     ...program,
     startTime: Date.now(),
+    sessionNote: "",
     exercises: program.exercises.map((exercise) => ({
       ...exercise,
       step: getDefaultStep(exercise.unit),
     })),
   });
+}
+
+export function getWorkingIndices(exercise) {
+  const warmup = exercise.warmup ?? [];
+  const total = exercise.reps?.length ?? 0;
+  const indices = [];
+  for (let i = 0; i < total; i += 1) {
+    if (!warmup[i]) indices.push(i);
+  }
+  return indices;
+}
+
+export function getWorkingReps(exercise) {
+  return getWorkingIndices(exercise).map((i) => exercise.reps[i]).filter((r) => r > 0);
+}
+
+export function getWorkingRpes(exercise) {
+  return getWorkingIndices(exercise).map((i) => exercise.rpe?.[i] ?? 0).filter((r) => r > 0);
 }
 
 export function hydrateHistoryEntry(entry, programs) {
@@ -54,18 +81,24 @@ export function hydrateHistoryEntry(entry, programs) {
   return {
     ...entry,
     tag: program?.tag ?? "HISTORY",
+    sessionNote: entry.sessionNote ?? "",
     exercises: entry.exercises.map((exercise) => {
       const matchedExercise = program?.exercises.find((item) => item.name === exercise.name);
+      const sets = matchedExercise?.sets ?? exercise.reps?.length ?? 1;
 
       return {
         ...matchedExercise,
         ...exercise,
-        sets: matchedExercise?.sets ?? exercise.reps.length,
+        sets,
         repRange: matchedExercise?.repRange ?? "8-12",
         note: matchedExercise?.note ?? "",
         step: exercise.step ?? getDefaultStep(exercise.unit),
-        reps: exercise.reps ?? new Array(matchedExercise?.sets ?? 1).fill(0),
-        rpe: exercise.rpe ?? new Array(matchedExercise?.sets ?? 1).fill(0),
+        reps: exercise.reps ?? new Array(sets).fill(0),
+        rpe: exercise.rpe ?? new Array(sets).fill(0),
+        warmup: Array.isArray(exercise.warmup) && exercise.warmup.length === sets
+          ? exercise.warmup
+          : new Array(sets).fill(false),
+        exerciseNote: exercise.exerciseNote ?? "",
       };
     }),
   };

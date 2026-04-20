@@ -34,12 +34,12 @@ function buildBuckets(history, keyFn) {
     b.totalMinutes += entry.duration || 0;
 
     for (const ex of entry.exercises) {
-      const validReps = ex.reps.filter((r) => r > 0);
+      const validReps = ex.reps.filter((r, i) => r > 0 && !ex.warmup?.[i]);
       b.totalSets += validReps.length;
       const reps = validReps.reduce((s, r) => s + r, 0);
       b.totalVolume += ex.weight > 0 ? ex.weight * reps : reps;
 
-      const rpesValid = (ex.rpe || []).filter((r) => r > 0);
+      const rpesValid = (ex.rpe || []).filter((r, i) => r > 0 && !ex.warmup?.[i]);
       b.rpes.push(...rpesValid);
     }
   }

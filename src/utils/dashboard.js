@@ -31,13 +31,14 @@ export function buildDashboardStats(history, programs, today = new Date()) {
       weeklySessions += 1;
       weeklyMinutes += entry.duration || 0;
       weeklySets += entry.exercises.reduce(
-        (sum, exercise) => sum + exercise.reps.filter((rep) => rep > 0).length,
+        (sum, exercise) => sum + exercise.reps.filter((rep, i) => rep > 0 && !exercise.warmup?.[i]).length,
         0,
       );
     }
 
     for (const exercise of entry.exercises) {
-      const maxRep = Math.max(0, ...exercise.reps);
+      const workingReps = exercise.reps.filter((_, i) => !exercise.warmup?.[i]);
+      const maxRep = Math.max(0, ...workingReps);
       if (maxRep === 0) continue;
 
       const score = (exercise.weight || 0) * maxRep;
@@ -63,7 +64,9 @@ export function buildDashboardStats(history, programs, today = new Date()) {
     weeklySessions,
     weeklyMinutes,
     weeklySets,
-    recentAvgRpe: recentEntry ? calcAvgRpe(recentEntry.exercises.flatMap((exercise) => exercise.rpe || [])) : 0,
+    recentAvgRpe: recentEntry ? calcAvgRpe(
+      recentEntry.exercises.flatMap((exercise) => (exercise.rpe || []).filter((_, i) => !exercise.warmup?.[i])),
+    ) : 0,
     lastSameProgramDate: lastSameProgram ? getDaysSinceLocalDate(lastSameProgram.date, today) : null,
     estimatedMinutes: Math.max(25, (nextProgram?.exercises.length ?? 0) * 7),
     bestSet,

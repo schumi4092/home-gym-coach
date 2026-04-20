@@ -15,12 +15,21 @@ export function normalizeHistory(history) {
     .filter((entry) => entry && typeof entry === "object")
     .map((entry) => ({
       ...entry,
+      sessionNote: typeof entry.sessionNote === "string" ? entry.sessionNote : "",
       exercises: Array.isArray(entry.exercises)
-        ? entry.exercises.map((exercise) => ({
-            ...exercise,
-            reps: Array.isArray(exercise?.reps) ? exercise.reps : [],
-            rpe: Array.isArray(exercise?.rpe) ? exercise.rpe : [],
-          }))
+        ? entry.exercises.map((exercise) => {
+            const reps = Array.isArray(exercise?.reps) ? exercise.reps : [];
+            const warmup = Array.isArray(exercise?.warmup) && exercise.warmup.length === reps.length
+              ? exercise.warmup
+              : new Array(reps.length).fill(false);
+            return {
+              ...exercise,
+              reps,
+              rpe: Array.isArray(exercise?.rpe) ? exercise.rpe : [],
+              warmup,
+              exerciseNote: typeof exercise?.exerciseNote === "string" ? exercise.exerciseNote : "",
+            };
+          })
         : [],
     }));
 

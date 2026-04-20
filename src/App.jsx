@@ -245,7 +245,7 @@ export default function App() {
   };
 
   if (loading) {
-    return <div style={{ background: T.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: T.t3 }}>頛銝?..</div>;
+    return <div style={{ background: T.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: T.t3 }}>載入中...</div>;
   }
 
   if (view === "progress") {
@@ -357,11 +357,11 @@ export default function App() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: T.accent, letterSpacing: "0.12em", marginBottom: 6 }}>HOME GYM</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: T.t1, lineHeight: 1.1 }}>撅振閮毀閮</div>
+            <div style={{ fontSize: 28, fontWeight: 600, color: T.t1, lineHeight: 1.1 }}>居家重訓儀表板</div>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <button onClick={() => setView("edit-program")} style={{ ...pillButtonBaseStyle, color: T.t1 }}>
-              蝺刻摩隤脰”
+              編輯課表
             </button>
             {history.length > 0 && (
               <>
@@ -369,7 +369,7 @@ export default function App() {
                   <svg width="14" height="14" viewBox="0 0 14 14">
                     <path d="M2 10L5 6L8 8L12 3" fill="none" stroke={T.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  ?脣漲餈質馱
+                  訓練進度
                 </button>
                 <button
                   onClick={async () => {
@@ -459,7 +459,7 @@ export default function App() {
                 開始今天訓練
               </button>
               <button onClick={() => setView("progress")} style={{ fontSize: 15, padding: "12px 16px", borderRadius: 10, border: `1px solid ${T.borderLight}`, cursor: "pointer", background: "rgba(17,17,16,0.28)", color: T.t1, fontWeight: 600 }}>
-                ?亦??脣漲
+                查看進度
               </button>
             </div>
           </div>
