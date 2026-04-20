@@ -138,6 +138,42 @@ export default function EditorialApp() {
     }));
   }, [setWorkoutAndSave]);
 
+  const addSet = useCallback((exerciseIndex, { warmup = false, position = "end" } = {}) => {
+    setWorkoutAndSave((previous) => ({
+      ...previous,
+      exercises: previous.exercises.map((exercise, currentIndex) => {
+        if (currentIndex !== exerciseIndex) return exercise;
+        const insertAt = position === "start" ? 0 : exercise.reps.length;
+        const insert = (arr, value) => [...arr.slice(0, insertAt), value, ...arr.slice(insertAt)];
+        return {
+          ...exercise,
+          reps: insert(exercise.reps, 0),
+          rpe: insert(exercise.rpe ?? exercise.reps.map(() => 0), 0),
+          warmup: insert(exercise.warmup ?? exercise.reps.map(() => false), warmup),
+          sets: exercise.reps.length + 1,
+        };
+      }),
+    }));
+  }, [setWorkoutAndSave]);
+
+  const removeSet = useCallback((exerciseIndex, setIndex) => {
+    setWorkoutAndSave((previous) => ({
+      ...previous,
+      exercises: previous.exercises.map((exercise, currentIndex) => {
+        if (currentIndex !== exerciseIndex) return exercise;
+        if (exercise.reps.length <= 1) return exercise;
+        const drop = (arr) => arr.filter((_, i) => i !== setIndex);
+        return {
+          ...exercise,
+          reps: drop(exercise.reps),
+          rpe: drop(exercise.rpe ?? exercise.reps.map(() => 0)),
+          warmup: drop(exercise.warmup ?? exercise.reps.map(() => false)),
+          sets: exercise.reps.length - 1,
+        };
+      }),
+    }));
+  }, [setWorkoutAndSave]);
+
   const updateExerciseNote = useCallback((exerciseIndex, note) => {
     setWorkoutAndSave((previous) => ({
       ...previous,
@@ -349,6 +385,8 @@ export default function EditorialApp() {
           onUpdateWeight={updateWeight}
           onUpdateStep={updateWeightStep}
           onToggleWarmup={toggleWarmup}
+          onAddSet={addSet}
+          onRemoveSet={removeSet}
           onUpdateExerciseNote={updateExerciseNote}
           onUpdateSessionNote={updateSessionNote}
           onSubstituteExercise={substituteExercise}

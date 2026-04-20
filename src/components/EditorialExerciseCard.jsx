@@ -10,6 +10,8 @@ export function EditorialExerciseCard({
   onRpe,
   onWeight,
   onToggleWarmup,
+  onAddSet,
+  onRemoveSet,
   onUpdateExerciseNote,
   onSubstitute,
   lastSession,
@@ -78,6 +80,14 @@ export function EditorialExerciseCard({
       )}
 
       <div>
+        {onAddSet && (
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 0 8px" }}>
+            <button
+              onClick={() => onAddSet(index, { warmup: true, position: "start" })}
+              style={addBtn}
+            >+ Warm-up set</button>
+          </div>
+        )}
         {exercise.reps.map((rep, setIdx) => (
           <EditorialSetRow
             key={setIdx}
@@ -88,12 +98,21 @@ export function EditorialExerciseCard({
             onRep={(v) => onRep(index, setIdx, v)}
             onRpe={(v) => onRpe(index, setIdx, v)}
             onToggleWarmup={() => onToggleWarmup?.(index, setIdx)}
+            onRemove={onRemoveSet && exercise.reps.length > 1 ? () => onRemoveSet(index, setIdx) : undefined}
             range={exercise.repRange}
             isActive={setIdx === activeSet}
             lastRep={lastReps?.[setIdx]}
             onFocus={() => setActiveSet(setIdx)}
           />
         ))}
+        {onAddSet && (
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "10px 0 0" }}>
+            <button
+              onClick={() => onAddSet(index, { warmup: false, position: "end" })}
+              style={addBtn}
+            >+ Add set</button>
+          </div>
+        )}
       </div>
 
       {/* Per-exercise note */}
@@ -126,4 +145,16 @@ const stepperBtn = {
   cursor: "pointer",
   fontFamily: "'IBM Plex Mono', monospace",
   display: "flex", alignItems: "center", justifyContent: "center",
+};
+
+const addBtn = {
+  background: "transparent",
+  border: `1px dashed ${TE.ink4}`,
+  color: TE.ink3,
+  padding: "6px 14px",
+  fontSize: 11,
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  fontFamily: "'IBM Plex Mono', monospace",
+  cursor: "pointer",
 };

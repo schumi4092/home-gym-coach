@@ -13,6 +13,8 @@ export function EditorialWorkout({
   onUpdateRpe,
   onUpdateWeight,
   onToggleWarmup,
+  onAddSet,
+  onRemoveSet,
   onUpdateExerciseNote,
   onUpdateSessionNote,
   onSubstituteExercise,
@@ -162,6 +164,8 @@ export function EditorialWorkout({
               onRpe={onUpdateRpe}
               onWeight={onUpdateWeight}
               onToggleWarmup={onToggleWarmup}
+              onAddSet={onAddSet}
+              onRemoveSet={onRemoveSet}
               onUpdateExerciseNote={onUpdateExerciseNote}
               onSubstitute={onSubstituteExercise ? (idx) => setSwapTargetIndex(idx) : undefined}
               lastSession={lastSessionText}

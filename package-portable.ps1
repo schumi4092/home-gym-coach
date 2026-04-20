@@ -11,7 +11,11 @@ if ($LASTEXITCODE -ne 0) {
   throw "Build failed."
 }
 
-if (-not (Test-Path $portableRoot)) {
+if (Test-Path $portableRoot) {
+  Get-ChildItem -LiteralPath $portableRoot -Recurse -Force |
+    Where-Object { $_.FullName -ne $portableRoot -and $_.Name -notin @("open-workout.bat") } |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+} else {
   New-Item -ItemType Directory -Path $portableRoot | Out-Null
 }
 
