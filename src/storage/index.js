@@ -96,7 +96,19 @@ if (useIDB) {
   );
 }
 
+let liveSaveTimer = null;
+let pendingLiveSession = null;
+
+function cancelPendingLiveSave() {
+  if (liveSaveTimer) {
+    clearTimeout(liveSaveTimer);
+    liveSaveTimer = null;
+  }
+  pendingLiveSession = null;
+}
+
 export async function persistLiveWorkout(session) {
+  cancelPendingLiveSave();
   try {
     await storage.set(STORAGE_KEYS.live, JSON.stringify(session));
   } catch (error) {
@@ -104,7 +116,27 @@ export async function persistLiveWorkout(session) {
   }
 }
 
+export function persistLiveWorkoutDebounced(session, ms = 400) {
+  pendingLiveSession = session;
+  if (liveSaveTimer) clearTimeout(liveSaveTimer);
+  liveSaveTimer = setTimeout(() => {
+    const snapshot = pendingLiveSession;
+    liveSaveTimer = null;
+    pendingLiveSession = null;
+    if (snapshot) void storage.set(STORAGE_KEYS.live, JSON.stringify(snapshot)).catch((e) => console.error("Failed to save live workout", e));
+  }, ms);
+}
+
+export async function flushLiveWorkout() {
+  if (liveSaveTimer && pendingLiveSession) {
+    const snapshot = pendingLiveSession;
+    cancelPendingLiveSave();
+    await persistLiveWorkout(snapshot);
+  }
+}
+
 export async function clearLiveWorkout() {
+  cancelPendingLiveSave();
   try {
     await storage.delete(STORAGE_KEYS.live);
   } catch (error) {

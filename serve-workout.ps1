@@ -22,6 +22,7 @@ function Get-ContentType {
     ".ico"  { return "image/x-icon" }
     ".webp" { return "image/webp" }
     ".txt"  { return "text/plain; charset=utf-8" }
+    ".webmanifest" { return "application/manifest+json" }
     default { return "application/octet-stream" }
   }
 }

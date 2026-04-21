@@ -7,8 +7,7 @@ export function buildDashboardStats(history, programs, today = new Date()) {
   const recentEntry = history[0] ?? null;
 
   let lastSameProgram = null;
-  let upperRecovery = null;
-  let lowerRecovery = null;
+  const lastByProgram = {};
   let weeklySessions = 0;
   let weeklyMinutes = 0;
   let weeklySets = 0;
@@ -19,12 +18,8 @@ export function buildDashboardStats(history, programs, today = new Date()) {
       lastSameProgram = entry;
     }
 
-    if (!upperRecovery && entry.dayId?.includes("upper")) {
-      upperRecovery = entry;
-    }
-
-    if (!lowerRecovery && entry.dayId?.includes("lower")) {
-      lowerRecovery = entry;
+    if (entry.dayId && !lastByProgram[entry.dayId]) {
+      lastByProgram[entry.dayId] = entry;
     }
 
     if (isLocalDateWithinDays(entry.date, 7, today)) {
@@ -70,7 +65,11 @@ export function buildDashboardStats(history, programs, today = new Date()) {
     lastSameProgramDate: lastSameProgram ? getDaysSinceLocalDate(lastSameProgram.date, today) : null,
     estimatedMinutes: Math.max(25, (nextProgram?.exercises.length ?? 0) * 7),
     bestSet,
-    upperRecoveryState: getRecoveryText(upperRecovery, today),
-    lowerRecoveryState: getRecoveryText(lowerRecovery, today),
+    recoveryByProgram: programs.map((program) => ({
+      id: program.id,
+      label: program.day,
+      tag: program.tag,
+      state: getRecoveryText(lastByProgram[program.id], today),
+    })),
   };
 }

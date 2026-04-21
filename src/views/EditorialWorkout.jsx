@@ -4,6 +4,7 @@ import { EditorialExerciseCard } from "../components/EditorialExerciseCard.jsx";
 import { EditorialTimer } from "../components/EditorialTimer.jsx";
 import { buildExerciseHistoryMap, createCoachingHint } from "../utils/coaching.js";
 import { getRestSeconds } from "../utils/workout.js";
+import { formatExerciseLoad } from "../utils/format.js";
 
 export function EditorialWorkout({
   session,
@@ -12,9 +13,10 @@ export function EditorialWorkout({
   onUpdateRep,
   onUpdateRpe,
   onUpdateWeight,
+  onUpdateSetWeight,
   onToggleWarmup,
-  onAddSet,
-  onRemoveSet,
+  onAddSet: rawAddSet,
+  onRemoveSet: rawRemoveSet,
   onUpdateExerciseNote,
   onUpdateSessionNote,
   onSubstituteExercise,
@@ -46,6 +48,9 @@ export function EditorialWorkout({
         .map((r, i) => `S${i + 1} ${r}r${currentHint.latest.avgRpe > 0 ? ` @ ${currentHint.latest.avgRpe}` : ""}`)
         .join(" · ")
     : null;
+  const lastSummaryText = currentHint?.latest
+    ? `上次 ${formatExerciseLoad(currentHint.latest.weight, currentHint.latest.unit)}，做了 ${currentHint.latest.reps.join("/")}。`
+    : null;
   const coachNote = useMemo(
     () => currentExercise ? createCoachingHint(currentExercise, currentHint?.latest, currentHint?.best) : null,
     [currentExercise, currentHint],
@@ -71,6 +76,24 @@ export function EditorialWorkout({
     setActiveEx(exIdx);
     const firstEmpty = session.exercises[exIdx].reps.findIndex((r) => r === 0);
     setActiveSet(firstEmpty === -1 ? 0 : firstEmpty);
+  };
+
+  const onAddSet = (exIdx, opts = {}) => {
+    rawAddSet(exIdx, opts);
+    if (exIdx === activeEx && opts.position === "start") {
+      setActiveSet((s) => s + 1);
+    }
+  };
+
+  const onRemoveSet = (exIdx, setIdx) => {
+    rawRemoveSet(exIdx, setIdx);
+    if (exIdx !== activeEx) return;
+    const nextLen = (session.exercises[exIdx]?.reps.length ?? 1) - 1;
+    setActiveSet((s) => {
+      if (setIdx < s) return Math.max(0, s - 1);
+      if (setIdx === s) return Math.max(0, Math.min(s, nextLen - 1));
+      return s;
+    });
   };
 
   return (
@@ -163,12 +186,14 @@ export function EditorialWorkout({
               onRep={handleRep}
               onRpe={onUpdateRpe}
               onWeight={onUpdateWeight}
+              onSetWeight={onUpdateSetWeight}
               onToggleWarmup={onToggleWarmup}
               onAddSet={onAddSet}
               onRemoveSet={onRemoveSet}
               onUpdateExerciseNote={onUpdateExerciseNote}
               onSubstitute={onSubstituteExercise ? (idx) => setSwapTargetIndex(idx) : undefined}
               lastSession={lastSessionText}
+              lastSummary={lastSummaryText}
               lastReps={lastReps}
               activeSet={activeSet}
               setActiveSet={setActiveSet}

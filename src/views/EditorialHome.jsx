@@ -33,8 +33,7 @@ export function EditorialHome({
     lastSameProgramDate,
     estimatedMinutes,
     bestSet,
-    upperRecoveryState,
-    lowerRecoveryState,
+    recoveryByProgram,
   } = stats;
 
   const dateLine = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -205,8 +204,9 @@ export function EditorialHome({
 
           <div style={{ marginTop: 32 }}>
             <div style={{ ...ES.label, marginBottom: 12 }}>Recovery</div>
-            <RecoveryRow label="Upper" state={upperRecoveryState} />
-            <RecoveryRow label="Lower" state={lowerRecoveryState} />
+            {recoveryByProgram.map((program) => (
+              <RecoveryRow key={program.id} label={program.label} state={program.state} />
+            ))}
           </div>
 
           {recentEntry && (

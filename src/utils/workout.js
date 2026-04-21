@@ -39,10 +39,18 @@ export function normalizeWorkoutSession(session) {
         warmup: Array.isArray(exercise.warmup) && exercise.warmup.length === sets
           ? exercise.warmup
           : new Array(sets).fill(false),
+        setWeights: Array.isArray(exercise.setWeights) && exercise.setWeights.length === sets
+          ? exercise.setWeights
+          : new Array(sets).fill(null),
         exerciseNote: exercise.exerciseNote ?? "",
       };
     }),
   };
+}
+
+export function getSetWeight(exercise, setIndex) {
+  const override = exercise.setWeights?.[setIndex];
+  return override == null ? exercise.weight : override;
 }
 
 export function createWorkoutSession(program) {
@@ -98,6 +106,9 @@ export function hydrateHistoryEntry(entry, programs) {
         warmup: Array.isArray(exercise.warmup) && exercise.warmup.length === sets
           ? exercise.warmup
           : new Array(sets).fill(false),
+        setWeights: Array.isArray(exercise.setWeights) && exercise.setWeights.length === sets
+          ? exercise.setWeights
+          : new Array(sets).fill(null),
         exerciseNote: exercise.exerciseNote ?? "",
       };
     }),

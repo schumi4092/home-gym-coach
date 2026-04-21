@@ -3,36 +3,63 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TE, ES } from "../constants/editorial-theme.js";
 import { formatSeconds } from "../utils/format.js";
 
+function playBeep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    osc.connect(gain).connect(ctx.destination);
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+    osc.start(now);
+    osc.stop(now + 0.55);
+    osc.onended = () => ctx.close();
+  } catch {
+    // ignore — vibrate fallback below still runs
+  }
+}
+
 export function EditorialTimer({ sec = 90, autoStartKey = 0 }) {
   const [total, setTotal] = useState(sec);
   const [left, setLeft] = useState(null);
   const [running, setRunning] = useState(false);
   const ref = useRef(null);
+  const endAtRef = useRef(null);
   const lastAutoKey = useRef(autoStartKey);
 
   useEffect(() => () => { if (ref.current) clearInterval(ref.current); }, []);
 
   const startWith = useCallback((seconds) => {
     if (ref.current) clearInterval(ref.current);
+    endAtRef.current = Date.now() + seconds * 1000;
     setLeft(seconds);
     setRunning(true);
     ref.current = setInterval(() => {
-      setLeft(p => {
-        if (p === null || p <= 1) {
-          clearInterval(ref.current); ref.current = null; setRunning(false);
-          navigator.vibrate?.(300);
-          return 0;
-        }
-        return p - 1;
-      });
-    }, 1000);
+      const remaining = Math.max(0, Math.round((endAtRef.current - Date.now()) / 1000));
+      if (remaining <= 0) {
+        clearInterval(ref.current); ref.current = null;
+        endAtRef.current = null;
+        setRunning(false);
+        setLeft(0);
+        navigator.vibrate?.(300);
+        playBeep();
+      } else {
+        setLeft(remaining);
+      }
+    }, 250);
   }, []);
 
   const start = useCallback(() => startWith(total), [startWith, total]);
 
   const stop = useCallback(() => {
     if (ref.current) clearInterval(ref.current);
-    ref.current = null; setRunning(false); setLeft(null);
+    ref.current = null; endAtRef.current = null; setRunning(false); setLeft(null);
   }, []);
 
   useEffect(() => {

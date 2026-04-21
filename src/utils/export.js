@@ -27,8 +27,9 @@ export function exportToMarkdown(history) {
       .filter((e) => e.exercises.some((ex) => ex.name === name))
       .map((e) => {
         const ex = e.exercises.find((item) => item.name === name);
-        const validReps = ex.reps.filter((r) => r > 0);
-        return { date: e.date, weight: ex.weight, unit: ex.unit, reps: validReps, avgRpe: calcAvgRpe(ex.rpe) };
+        const validReps = ex.reps.filter((r, i) => r > 0 && !ex.warmup?.[i]);
+        const workingRpes = (ex.rpe || []).filter((_, i) => !ex.warmup?.[i]);
+        return { date: e.date, weight: ex.weight, unit: ex.unit, reps: validReps, avgRpe: calcAvgRpe(workingRpes) };
       })
       .reverse();
     if (sessions.length === 0) continue;
@@ -46,10 +47,12 @@ export function exportToMarkdown(history) {
   for (const entry of history.slice(0, 10)) {
     lines.push(`### ${entry.date} — ${entry.day}（${entry.duration} 分鐘）`);
     for (const ex of entry.exercises) {
-      const validReps = ex.reps.filter((r) => r > 0);
+      const validReps = ex.reps.filter((r, i) => r > 0 && !ex.warmup?.[i]);
       if (validReps.length === 0) continue;
+      const workingRpes = (ex.rpe || []).filter((_, i) => !ex.warmup?.[i]);
+      const avgRpe = calcAvgRpe(workingRpes);
       const load = ex.weight > 0 ? `${ex.weight} ${ex.unit}` : "自體重";
-      const rpeStr = calcAvgRpe(ex.rpe) > 0 ? `，RPE ${calcAvgRpe(ex.rpe)}` : "";
+      const rpeStr = avgRpe > 0 ? `，RPE ${avgRpe}` : "";
       lines.push(`- ${ex.name}：${load}，${validReps.join("/")} 下${rpeStr}`);
     }
     lines.push("");

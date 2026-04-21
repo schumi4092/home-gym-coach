@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DEFAULT_PROGRAM, STORAGE_KEYS } from "./constants/defaults.js";
 import { TE, ES } from "./constants/editorial-theme.js";
-import { storage, persistLiveWorkout, clearLiveWorkout } from "./storage/index.js";
+import { storage, persistLiveWorkout, persistLiveWorkoutDebounced, flushLiveWorkout, clearLiveWorkout } from "./storage/index.js";
 import { formatLocalDate } from "./utils/format.js";
 import { buildDashboardStats } from "./utils/dashboard.js";
 import { checkDeloadSuggestion } from "./utils/coaching.js";
@@ -11,9 +11,18 @@ import { normalizeHistory } from "./utils/history.js";
 import { createWorkoutSession, normalizeWorkoutSession, getDefaultStep } from "./utils/workout.js";
 import { EditorialHome } from "./views/EditorialHome.jsx";
 import { EditorialWorkout } from "./views/EditorialWorkout.jsx";
-import { EditorialProgress } from "./views/EditorialProgress.jsx";
-import { EditorialHistoryEditor } from "./views/EditorialHistoryEditor.jsx";
-import { EditorialProgramEditor } from "./views/EditorialProgramEditor.jsx";
+
+const EditorialProgress = lazy(() => import("./views/EditorialProgress.jsx").then((m) => ({ default: m.EditorialProgress })));
+const EditorialHistoryEditor = lazy(() => import("./views/EditorialHistoryEditor.jsx").then((m) => ({ default: m.EditorialHistoryEditor })));
+const EditorialProgramEditor = lazy(() => import("./views/EditorialProgramEditor.jsx").then((m) => ({ default: m.EditorialProgramEditor })));
+
+function ViewFallback() {
+  return (
+    <div style={{ ...ES.shell, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ ...ES.label }}>Loading…</div>
+    </div>
+  );
+}
 
 export default function EditorialApp() {
   const [view, setView] = useState("home");
@@ -69,11 +78,14 @@ export default function EditorialApp() {
     return () => { cancelled = true; };
   }, []);
 
-  const setWorkoutAndSave = useCallback((updater) => {
+  const setWorkoutAndSave = useCallback((updater, { debounce = false } = {}) => {
     setWorkoutSession((previous) => {
       if (!previous) return previous;
       const next = typeof updater === "function" ? updater(previous) : updater;
-      if (next) void persistLiveWorkout(next);
+      if (next) {
+        if (debounce) persistLiveWorkoutDebounced(next);
+        else void persistLiveWorkout(next);
+      }
       return next;
     });
   }, []);
@@ -118,6 +130,20 @@ export default function EditorialApp() {
     }));
   }, [setWorkoutAndSave]);
 
+  const updateSetWeight = useCallback((exerciseIndex, setIndex, value) => {
+    setWorkoutAndSave((previous) => ({
+      ...previous,
+      exercises: previous.exercises.map((exercise, currentIndex) => {
+        if (currentIndex !== exerciseIndex) return exercise;
+        const base = exercise.setWeights ?? exercise.reps.map(() => null);
+        return {
+          ...exercise,
+          setWeights: base.map((w, i) => (i === setIndex ? value : w)),
+        };
+      }),
+    }));
+  }, [setWorkoutAndSave]);
+
   const updateWeightStep = useCallback((exerciseIndex, value) => {
     setWorkoutAndSave((previous) => ({
       ...previous,
@@ -145,11 +171,15 @@ export default function EditorialApp() {
         if (currentIndex !== exerciseIndex) return exercise;
         const insertAt = position === "start" ? 0 : exercise.reps.length;
         const insert = (arr, value) => [...arr.slice(0, insertAt), value, ...arr.slice(insertAt)];
+        const defaultWarmupWeight = warmup && exercise.unit !== "bw"
+          ? Math.max(0, Math.round(exercise.weight * 0.5 * 100) / 100)
+          : null;
         return {
           ...exercise,
           reps: insert(exercise.reps, 0),
           rpe: insert(exercise.rpe ?? exercise.reps.map(() => 0), 0),
           warmup: insert(exercise.warmup ?? exercise.reps.map(() => false), warmup),
+          setWeights: insert(exercise.setWeights ?? exercise.reps.map(() => null), defaultWarmupWeight),
           sets: exercise.reps.length + 1,
         };
       }),
@@ -168,6 +198,7 @@ export default function EditorialApp() {
           reps: drop(exercise.reps),
           rpe: drop(exercise.rpe ?? exercise.reps.map(() => 0)),
           warmup: drop(exercise.warmup ?? exercise.reps.map(() => false)),
+          setWeights: drop(exercise.setWeights ?? exercise.reps.map(() => null)),
           sets: exercise.reps.length - 1,
         };
       }),
@@ -180,11 +211,11 @@ export default function EditorialApp() {
       exercises: previous.exercises.map((exercise, currentIndex) => (
         currentIndex === exerciseIndex ? { ...exercise, exerciseNote: note } : exercise
       )),
-    }));
+    }), { debounce: true });
   }, [setWorkoutAndSave]);
 
   const updateSessionNote = useCallback((note) => {
-    setWorkoutAndSave((previous) => ({ ...previous, sessionNote: note }));
+    setWorkoutAndSave((previous) => ({ ...previous, sessionNote: note }), { debounce: true });
   }, [setWorkoutAndSave]);
 
   const substituteExercise = useCallback((exerciseIndex, replacement) => {
@@ -201,6 +232,7 @@ export default function EditorialApp() {
         reps: new Array(sets).fill(0),
         rpe: new Array(sets).fill(0),
         warmup: new Array(sets).fill(false),
+        setWeights: new Array(sets).fill(null),
         exerciseNote: "",
       };
       return {
@@ -213,6 +245,7 @@ export default function EditorialApp() {
   }, [setWorkoutAndSave]);
 
   const discardWorkout = useCallback(async () => {
+    await flushLiveWorkout();
     await clearLiveWorkout();
     setWorkoutSession(null);
     setView("home");
@@ -220,6 +253,7 @@ export default function EditorialApp() {
 
   const finishWorkout = useCallback(async () => {
     if (!workoutSession) return;
+    await flushLiveWorkout();
 
     const entry = {
       date: formatLocalDate(),
@@ -234,6 +268,7 @@ export default function EditorialApp() {
         reps: exercise.reps,
         rpe: exercise.rpe,
         warmup: exercise.warmup ?? exercise.reps.map(() => false),
+        setWeights: exercise.setWeights ?? exercise.reps.map(() => null),
         exerciseNote: exercise.exerciseNote ?? "",
       })),
     };
@@ -283,6 +318,7 @@ export default function EditorialApp() {
         reps: exercise.reps,
         rpe: exercise.rpe,
         warmup: exercise.warmup ?? exercise.reps.map(() => false),
+        setWeights: exercise.setWeights ?? exercise.reps.map(() => null),
         exerciseNote: exercise.exerciseNote ?? "",
       })),
     };
@@ -353,22 +389,26 @@ export default function EditorialApp() {
 
   if (view === "edit-history" && editingHistoryIndex !== null && history[editingHistoryIndex]) {
     return (
-      <EditorialHistoryEditor
-        entry={history[editingHistoryIndex]}
-        programs={programs}
-        onBack={() => { setEditingHistoryIndex(null); setView("home"); }}
-        onSave={(updatedEntry) => void saveHistoryEntry(editingHistoryIndex, updatedEntry)}
-      />
+      <Suspense fallback={<ViewFallback />}>
+        <EditorialHistoryEditor
+          entry={history[editingHistoryIndex]}
+          programs={programs}
+          onBack={() => { setEditingHistoryIndex(null); setView("home"); }}
+          onSave={(updatedEntry) => void saveHistoryEntry(editingHistoryIndex, updatedEntry)}
+        />
+      </Suspense>
     );
   }
 
   if (view === "edit-program") {
     return (
-      <EditorialProgramEditor
-        programs={programs}
-        onBack={() => setView("home")}
-        onSave={(updatedPrograms) => void savePrograms(updatedPrograms)}
-      />
+      <Suspense fallback={<ViewFallback />}>
+        <EditorialProgramEditor
+          programs={programs}
+          onBack={() => setView("home")}
+          onSave={(updatedPrograms) => void savePrograms(updatedPrograms)}
+        />
+      </Suspense>
     );
   }
 
@@ -383,6 +423,7 @@ export default function EditorialApp() {
           onUpdateRep={updateRep}
           onUpdateRpe={updateRpe}
           onUpdateWeight={updateWeight}
+          onUpdateSetWeight={updateSetWeight}
           onUpdateStep={updateWeightStep}
           onToggleWarmup={toggleWarmup}
           onAddSet={addSet}
@@ -401,12 +442,14 @@ export default function EditorialApp() {
     return (
       <div style={ES.shell}>
         <EditorialNav view={view} setView={setView} />
-        <EditorialProgress
-          history={history}
-          onExit={() => setView("home")}
-          onEdit={(index) => { setEditingHistoryIndex(index); setView("edit-history"); }}
-          onDelete={(index) => void deleteHistoryEntry(index)}
-        />
+        <Suspense fallback={<ViewFallback />}>
+          <EditorialProgress
+            history={history}
+            onExit={() => setView("home")}
+            onEdit={(index) => { setEditingHistoryIndex(index); setView("edit-history"); }}
+            onDelete={(index) => void deleteHistoryEntry(index)}
+          />
+        </Suspense>
       </div>
     );
   }

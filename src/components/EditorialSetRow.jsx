@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TE, ES } from "../constants/editorial-theme.js";
 import { RPE_OPTIONS } from "../constants/defaults.js";
-import { parseRepRange } from "../utils/format.js";
+import { parseRepRange, formatExerciseLoad } from "../utils/format.js";
 
 export function EditorialSetRow({
   index,
   rep,
   rpe,
   warmup,
+  setWeight,
+  unit,
+  showWeightStepper,
+  onAdjustWeight,
   onRep,
   onRpe,
   onToggleWarmup,
@@ -136,6 +140,23 @@ export function EditorialSetRow({
         </div>
       </div>
 
+      {showWeightStepper && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 58, marginBottom: 10 }}>
+          <span style={{ ...ES.mono, fontSize: 10, color: TE.ink3, letterSpacing: "0.1em" }}>LOAD</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onAdjustWeight(-1); }}
+            style={inlineWeightBtn}
+          >−</button>
+          <span style={{ ...ES.num, fontSize: 16, minWidth: 60, textAlign: "center", color: TE.ink2 }}>
+            {formatExerciseLoad(setWeight, unit)}
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onAdjustWeight(1); }}
+            style={inlineWeightBtn}
+          >+</button>
+        </div>
+      )}
+
       {quickPicks.length > 0 && (
         <div style={{ display: "flex", gap: 18, paddingLeft: 58, marginBottom: 12, flexWrap: "wrap", alignItems: "baseline" }}>
           {quickPicks.map((v) => (
@@ -208,6 +229,17 @@ function buildQuickPicks(range) {
   for (let v = low; v <= high; v += 1) picks.push(v);
   return picks;
 }
+
+const inlineWeightBtn = {
+  width: 26, height: 26,
+  border: `1px solid ${TE.ink4}`,
+  background: "transparent",
+  color: TE.ink2,
+  fontSize: 14,
+  cursor: "pointer",
+  fontFamily: "'IBM Plex Mono', monospace",
+  display: "flex", alignItems: "center", justifyContent: "center",
+};
 
 const stepBtnBase = {
   border: `1.5px solid ${TE.ink}`,

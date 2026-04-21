@@ -1,7 +1,7 @@
 import { TE, ES } from "../constants/editorial-theme.js";
 import { EditorialSetRow } from "./EditorialSetRow.jsx";
 import { formatExerciseLoad } from "../utils/format.js";
-import { getAdjustedWeight } from "../utils/workout.js";
+import { getAdjustedWeight, getSetWeight } from "../utils/workout.js";
 
 export function EditorialExerciseCard({
   exercise,
@@ -9,18 +9,22 @@ export function EditorialExerciseCard({
   onRep,
   onRpe,
   onWeight,
+  onSetWeight,
   onToggleWarmup,
   onAddSet,
   onRemoveSet,
   onUpdateExerciseNote,
   onSubstitute,
   lastSession,
+  lastSummary,
   lastReps,
   activeSet,
   setActiveSet,
 }) {
   const unit = exercise.unit;
   const step = exercise.step ?? 1;
+  const workingSetCount = exercise.reps.filter((_, i) => !exercise.warmup?.[i]).length;
+  const warmupCount = exercise.reps.length - workingSetCount;
 
   const adjustWeight = (direction) => {
     if (unit === "bw") return;
@@ -50,11 +54,11 @@ export function EditorialExerciseCard({
         </h2>
         <div style={{ display: "flex", gap: 24, marginTop: 10, ...ES.mono, fontSize: 11, color: TE.ink3, letterSpacing: "0.08em", flexWrap: "wrap" }}>
           <span>TARGET · {exercise.repRange} reps</span>
-          <span>{exercise.sets} sets</span>
+          <span>{workingSetCount} working{warmupCount > 0 ? ` · ${warmupCount} warm-up` : ""}</span>
         </div>
-        {exercise.note && (
+        {(lastSummary || exercise.note) && (
           <p style={{ margin: "12px 0 0", fontSize: 14, color: TE.ink2, fontStyle: "italic", lineHeight: 1.5 }}>
-            {exercise.note}
+            {lastSummary ?? exercise.note}
           </p>
         )}
       </header>
@@ -88,23 +92,35 @@ export function EditorialExerciseCard({
             >+ Warm-up set</button>
           </div>
         )}
-        {exercise.reps.map((rep, setIdx) => (
-          <EditorialSetRow
-            key={setIdx}
-            index={setIdx}
-            rep={rep}
-            rpe={exercise.rpe[setIdx] ?? 0}
-            warmup={exercise.warmup?.[setIdx] ?? false}
-            onRep={(v) => onRep(index, setIdx, v)}
-            onRpe={(v) => onRpe(index, setIdx, v)}
-            onToggleWarmup={() => onToggleWarmup?.(index, setIdx)}
-            onRemove={onRemoveSet && exercise.reps.length > 1 ? () => onRemoveSet(index, setIdx) : undefined}
-            range={exercise.repRange}
-            isActive={setIdx === activeSet}
-            lastRep={lastReps?.[setIdx]}
-            onFocus={() => setActiveSet(setIdx)}
-          />
-        ))}
+        {exercise.reps.map((rep, setIdx) => {
+          const isWarmup = exercise.warmup?.[setIdx] ?? false;
+          const setWeight = getSetWeight(exercise, setIdx);
+          const adjustSetWeight = (direction) => {
+            if (unit === "bw") return;
+            onSetWeight?.(index, setIdx, getAdjustedWeight(setWeight, step, direction));
+          };
+          return (
+            <EditorialSetRow
+              key={setIdx}
+              index={setIdx}
+              rep={rep}
+              rpe={exercise.rpe[setIdx] ?? 0}
+              warmup={isWarmup}
+              setWeight={setWeight}
+              unit={unit}
+              showWeightStepper={isWarmup && unit !== "bw" && !!onSetWeight}
+              onAdjustWeight={adjustSetWeight}
+              onRep={(v) => onRep(index, setIdx, v)}
+              onRpe={(v) => onRpe(index, setIdx, v)}
+              onToggleWarmup={() => onToggleWarmup?.(index, setIdx)}
+              onRemove={onRemoveSet && exercise.reps.length > 1 ? () => onRemoveSet(index, setIdx) : undefined}
+              range={exercise.repRange}
+              isActive={setIdx === activeSet}
+              lastRep={lastReps?.[setIdx]}
+              onFocus={() => setActiveSet(setIdx)}
+            />
+          );
+        })}
         {onAddSet && (
           <div style={{ display: "flex", justifyContent: "flex-end", padding: "10px 0 0" }}>
             <button
