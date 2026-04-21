@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons.svg'],
       manifest: {
-        name: 'Home Gym Coach',
-        short_name: 'Workout',
+        name: 'Gym Coach',
+        short_name: 'Gym',
         description: 'Personal training journal — sessions, history, coaching cues.',
         theme_color: '#14130f',
         background_color: '#f5f1e8',
