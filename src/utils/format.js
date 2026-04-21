@@ -43,6 +43,23 @@ export function isLocalDateWithinDays(value, days, now = new Date()) {
   return date >= cutoff;
 }
 
+export function startOfLocalWeek(now = new Date()) {
+  const day = startOfLocalDay(now);
+  const dow = day.getDay();
+  const offset = (dow + 6) % 7;
+  day.setDate(day.getDate() - offset);
+  return day;
+}
+
+export function isInCurrentLocalWeek(value, now = new Date()) {
+  const date = parseLocalDate(value);
+  if (!date) return false;
+  const start = startOfLocalWeek(now);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return date >= start && date < end;
+}
+
 export function getDaysSinceLocalDate(value, now = new Date()) {
   const date = parseLocalDate(value);
   if (!date) return null;

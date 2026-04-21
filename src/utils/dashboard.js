@@ -1,4 +1,4 @@
-import { calcAvgRpe, getDaysSinceLocalDate, isLocalDateWithinDays } from "./format.js";
+import { calcAvgRpe, getDaysSinceLocalDate, isInCurrentLocalWeek } from "./format.js";
 import { getNextProgramId, getRecoveryText } from "./workout.js";
 
 export function buildDashboardStats(history, programs, today = new Date()) {
@@ -22,7 +22,7 @@ export function buildDashboardStats(history, programs, today = new Date()) {
       lastByProgram[entry.dayId] = entry;
     }
 
-    if (isLocalDateWithinDays(entry.date, 7, today)) {
+    if (isInCurrentLocalWeek(entry.date, today)) {
       weeklySessions += 1;
       weeklyMinutes += entry.duration || 0;
       weeklySets += entry.exercises.reduce(

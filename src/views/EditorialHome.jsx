@@ -135,7 +135,7 @@ export function EditorialHome({
         marginBottom: 40,
       }}>
         <Metric label="This week" value={weeklySessions} unit={weeklySessions === 1 ? "session" : "sessions"} />
-        <Metric label="Minutes · 7 days" value={weeklyMinutes} unit="min" divider />
+        <Metric label="Minutes · this week" value={weeklyMinutes} unit="min" divider />
         <Metric
           label="Best recent set"
           value={bestSet ? (bestSet.weight > 0 ? `${bestSet.weight}${bestSet.unit}` : "BW") : "—"}
@@ -156,7 +156,7 @@ export function EditorialHome({
             <table style={{ width: "100%", borderCollapse: "collapse", ...ES.mono, fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${TE.rule}` }}>
-                  <Th>Date</Th><Th>Type</Th><Th align="right">Ex.</Th><Th align="right">RPE</Th><Th align="right"></Th>
+                  <Th>Date</Th><Th>Type</Th><Th align="right">Ex.</Th><Th align="right">Min</Th><Th align="right">RPE</Th><Th align="right"></Th>
                 </tr>
               </thead>
               <tbody>
@@ -174,6 +174,7 @@ export function EditorialHome({
                         <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontStyle: "italic" }}>{entry.day}</span>
                       </Td>
                       <Td align="right">{completed}/{entry.exercises.length}</Td>
+                      <Td align="right">{entry.duration > 0 ? entry.duration : "—"}</Td>
                       <Td align="right">{avgRpe > 0 ? avgRpe.toFixed(1) : "—"}</Td>
                       <Td align="right">
                         <button
