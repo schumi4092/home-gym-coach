@@ -17,6 +17,12 @@ release/
 
 # Personal data
 my-personal-program.js
+data/
+home-gym-backup-*.json
+
+# Local working scratch
+.claude/
+_patch/
 
 # Editor directories and files
 .vscode/*

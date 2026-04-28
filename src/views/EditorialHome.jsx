@@ -1,6 +1,6 @@
 import { TE, ES, primaryBtn, secondaryBtn } from "../constants/editorial-theme.js";
-import { TRAINING_FLOW } from "../constants/defaults.js";
-import { calcAvgRpe, getDaysSinceLocalDate } from "../utils/format.js";
+import { calcAvgRpe } from "../utils/format.js";
+import { MonthCalendar } from "../components/MonthCalendar.jsx";
 
 export function EditorialHome({
   stats,
@@ -8,11 +8,14 @@ export function EditorialHome({
   programs,
   today,
   deloadSuggestion,
+  liveSession,
+  onResume,
   onStart,
   onProgress,
   onEditProgram,
   onEditHistory,
   onDeleteHistory,
+  onAddHistory,
   onExportMarkdown,
   onExportBackup,
   onImportClick,
@@ -83,32 +86,73 @@ export function EditorialHome({
         />
       </div>
 
-      {/* Masthead */}
-      <div style={{ marginBottom: 48 }}>
-        <div style={{ ...ES.mono, fontSize: 11, color: TE.ink3, letterSpacing: "0.15em", marginBottom: 8 }}>
-          {dateLine.toUpperCase()} · ISSUE №{history.length + 1}
+      {/* Masthead — left: Next up · right: Month calendar */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+        gap: 48, alignItems: "start", marginBottom: 48,
+      }}>
+        <div>
+          <div style={{ ...ES.mono, fontSize: 11, color: TE.ink3, letterSpacing: "0.15em", marginBottom: 8 }}>
+            {dateLine.toUpperCase()} · ISSUE №{history.length + 1}
+          </div>
+          <h1 style={{
+            ...ES.num, fontSize: 96, lineHeight: 0.95, letterSpacing: "-0.04em",
+            margin: 0, fontWeight: 400,
+          }}>
+            Next up:<br />
+            <em style={{ fontStyle: "italic", fontWeight: 400 }}>{nextProgram?.day ?? "—"}</em>
+          </h1>
+          <div style={{ display: "flex", gap: 16, marginTop: 32, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={() => onStart(nextProgramId)}
+              disabled={!nextProgram}
+              style={{ ...primaryBtn, fontSize: 14, padding: "16px 32px", opacity: nextProgram ? 1 : 0.4 }}
+            >
+              Begin session →
+            </button>
+            <span style={{ ...ES.mono, fontSize: 11, color: TE.ink3, letterSpacing: "0.08em" }}>
+              {nextProgram ? `${nextProgram.exercises.length} exercises · est. ${estimatedMinutes} min` : "No program"}
+              {lastSameProgramDate !== null && ` · last done ${lastSameProgramDate}d ago`}
+            </span>
+          </div>
         </div>
-        <h1 style={{
-          ...ES.num, fontSize: 96, lineHeight: 0.95, letterSpacing: "-0.04em",
-          margin: 0, fontWeight: 400,
-        }}>
-          Next up:<br />
-          <em style={{ fontStyle: "italic", fontWeight: 400 }}>{nextProgram?.day ?? "—"}</em>
-        </h1>
-        <div style={{ display: "flex", gap: 16, marginTop: 32, alignItems: "center", flexWrap: "wrap" }}>
-          <button
-            onClick={() => onStart(nextProgramId)}
-            disabled={!nextProgram}
-            style={{ ...primaryBtn, fontSize: 14, padding: "16px 32px", opacity: nextProgram ? 1 : 0.4 }}
-          >
-            Begin session →
-          </button>
-          <span style={{ ...ES.mono, fontSize: 11, color: TE.ink3, letterSpacing: "0.08em" }}>
-            {nextProgram ? `${nextProgram.exercises.length} exercises · est. ${estimatedMinutes} min` : "No program"}
-            {lastSameProgramDate !== null && ` · last done ${lastSameProgramDate}d ago`}
-          </span>
-        </div>
+
+        <MonthCalendar
+          history={history}
+          today={today}
+          programs={programs}
+          onEditHistory={onEditHistory}
+          onAddHistory={onAddHistory}
+        />
       </div>
+
+      {/* Resume in-progress session */}
+      {liveSession && (
+        <div style={{
+          marginBottom: 36,
+          padding: "18px 20px",
+          background: TE.surface,
+          borderLeft: `3px solid ${TE.accent}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}>
+          <div>
+            <div style={{ ...ES.label, color: TE.accent, marginBottom: 6 }}>In progress</div>
+            <div style={{ fontSize: 15, color: TE.ink }}>
+              <span style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 18 }}>{liveSession.day}</span>
+              <span style={{ ...ES.mono, fontSize: 11, color: TE.ink3, marginLeft: 12, letterSpacing: "0.08em" }}>
+                {liveSession.exercises.length} exercises
+              </span>
+            </div>
+          </div>
+          <button onClick={onResume} style={{ ...primaryBtn, fontSize: 12, padding: "12px 22px" }}>
+            Resume →
+          </button>
+        </div>
+      )}
 
       {/* Deload suggestion */}
       {deloadSuggestion && (
@@ -200,11 +244,8 @@ export function EditorialHome({
         </section>
 
         <aside>
-          <SectionHead kicker="Up next" title="This week" />
-          <WeekGrid history={history} today={today} nextProgramId={nextProgramId} onStart={onStart} />
-
-          <div style={{ marginTop: 32 }}>
-            <div style={{ ...ES.label, marginBottom: 12 }}>Recovery</div>
+          <SectionHead kicker="Status" title="Recovery" />
+          <div>
             {recoveryByProgram.map((program) => (
               <RecoveryRow key={program.id} label={program.label} state={program.state} />
             ))}
@@ -309,37 +350,3 @@ function RecoveryRow({ label, state }) {
   );
 }
 
-function WeekGrid({ history, today, nextProgramId, onStart }) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0, borderTop: `1px solid ${TE.rule}`, borderBottom: `1px solid ${TE.rule}` }}>
-      {TRAINING_FLOW.map((day, i) => {
-        const isRest = day.type === "rest";
-        const isNext = day.type === nextProgramId;
-        const lastDone = !isRest ? history.find((entry) => entry.dayId === day.type) : null;
-        const daysAgo = lastDone ? getDaysSinceLocalDate(lastDone.date, today) : null;
-
-        return (
-          <div
-            key={`${day.label}-${i}`}
-            onClick={() => { if (!isRest) onStart(day.type); }}
-            style={{
-              padding: "14px 4px", textAlign: "center",
-              borderRight: i < 6 ? `1px solid ${TE.rule}` : 0,
-              background: isNext ? TE.highlight : "transparent",
-              cursor: isRest ? "default" : "pointer",
-            }}
-          >
-            <div style={{ ...ES.label, fontSize: 10, color: TE.ink3 }}>{day.short}</div>
-            <div style={{
-              ...ES.num, fontSize: 13, marginTop: 4,
-              color: isRest ? TE.ink4 : TE.ink,
-              fontStyle: isNext ? "italic" : "normal",
-            }}>
-              {daysAgo === null && !isRest ? "—" : daysAgo === 0 ? "today" : daysAgo !== null ? `${daysAgo}d` : "·"}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}

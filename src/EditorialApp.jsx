@@ -1,9 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DEFAULT_PROGRAM, STORAGE_KEYS } from "./constants/defaults.js";
-import { TE, ES } from "./constants/editorial-theme.js";
+import { TE, ES, SPLIT_COLORS } from "./constants/editorial-theme.js";
 import { storage, persistLiveWorkout, persistLiveWorkoutDebounced, flushLiveWorkout, clearLiveWorkout } from "./storage/index.js";
-import { formatLocalDate } from "./utils/format.js";
+import { formatLocalDate, parseLocalDate } from "./utils/format.js";
 import { buildDashboardStats } from "./utils/dashboard.js";
 import { checkDeloadSuggestion } from "./utils/coaching.js";
 import { exportToMarkdown, exportBackup, importBackup } from "./utils/export.js";
@@ -45,7 +45,11 @@ export default function EditorialApp() {
         if (!cancelled && storedPrograms) {
           const parsedPrograms = JSON.parse(storedPrograms.value);
           if (Array.isArray(parsedPrograms) && parsedPrograms.length > 0) {
-            setPrograms(parsedPrograms);
+            const hydrated = parsedPrograms.map((p) => ({
+              ...p,
+              accent: p.accent ?? SPLIT_COLORS[p.id] ?? "#14130F",
+            }));
+            setPrograms(hydrated);
           }
         }
       } catch (error) {
@@ -65,7 +69,6 @@ export default function EditorialApp() {
         const storedLive = await storage.get(STORAGE_KEYS.live);
         if (!cancelled && storedLive) {
           setWorkoutSession(normalizeWorkoutSession(JSON.parse(storedLive.value)));
-          setView("workout");
         }
       } catch (error) {
         console.error("Failed to load live workout", error);
@@ -287,6 +290,50 @@ export default function EditorialApp() {
     setView("home");
   }, [history, workoutSession]);
 
+  const addHistoryEntry = useCallback(async (date, programId) => {
+    const program = programs.find((p) => p.id === programId);
+    if (!program) return;
+
+    const newEntry = {
+      date,
+      day: program.day,
+      dayId: program.id,
+      duration: 0,
+      sessionNote: "",
+      exercises: program.exercises.map((exercise) => {
+        const sets = exercise.sets ?? 1;
+        return {
+          name: exercise.name,
+          weight: exercise.weight ?? 0,
+          unit: exercise.unit ?? "kg",
+          reps: new Array(sets).fill(0),
+          rpe: new Array(sets).fill(0),
+          warmup: new Array(sets).fill(false),
+          setWeights: new Array(sets).fill(null),
+          exerciseNote: "",
+        };
+      }),
+    };
+
+    const newTime = parseLocalDate(date)?.getTime() ?? 0;
+    let insertAt = history.length;
+    for (let i = 0; i < history.length; i++) {
+      const t = parseLocalDate(history[i].date)?.getTime() ?? 0;
+      if (newTime >= t) { insertAt = i; break; }
+    }
+    const nextHistory = [...history.slice(0, insertAt), newEntry, ...history.slice(insertAt)];
+    setHistory(nextHistory);
+
+    try {
+      await storage.set(STORAGE_KEYS.history, JSON.stringify(nextHistory));
+    } catch (error) {
+      console.error("Failed to save history", error);
+    }
+
+    setEditingHistoryIndex(insertAt);
+    setView("edit-history");
+  }, [history, programs]);
+
   const deleteHistoryEntry = useCallback(async (indexToDelete) => {
     const target = history[indexToDelete];
     if (!target) return;
@@ -463,11 +510,14 @@ export default function EditorialApp() {
         programs={programs}
         today={today}
         deloadSuggestion={deloadSuggestion}
+        liveSession={workoutSession}
+        onResume={() => setView("workout")}
         onStart={(id) => startWorkout(id)}
         onProgress={() => setView("progress")}
         onEditProgram={() => setView("edit-program")}
         onEditHistory={(index) => { setEditingHistoryIndex(index); setView("edit-history"); }}
         onDeleteHistory={(index) => void deleteHistoryEntry(index)}
+        onAddHistory={(date, programId) => void addHistoryEntry(date, programId)}
         onExportMarkdown={handleExportMarkdown}
         onExportBackup={() => exportBackup(history, programs)}
         onImportClick={handleImportClick}

@@ -1,22 +1,31 @@
 @echo off
 setlocal
+cd /d "%~dp0"
 
-set "ROOT=%~dp0"
-set "PORTABLE=%ROOT%release\my-workout-portable\open-workout.bat"
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$procs = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -match 'serve-workout\.ps1' }; foreach ($p in $procs) { try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop } catch {} }"
-
-if exist "%PORTABLE%" (
-  start "" "%PORTABLE%"
-  exit /b 0
+where node >nul 2>nul
+if errorlevel 1 (
+  echo [!] Node.js not found in PATH. Falling back to the legacy PowerShell server.
+  echo.
+  powershell -ExecutionPolicy Bypass -File "%~dp0serve-workout.ps1"
+  echo.
+  echo [Legacy server stopped. Exit code %ERRORLEVEL%]
+  pause
+  exit /b %ERRORLEVEL%
 )
 
-powershell -ExecutionPolicy Bypass -File "%ROOT%package-portable.ps1"
-
-if exist "%PORTABLE%" (
-  start "" "%PORTABLE%"
-  exit /b 0
+if not exist "%~dp0dist\index.html" (
+  echo Building the app for the first time...
+  call npm run build
+  if errorlevel 1 (
+    echo [!] Build failed.
+    pause
+    exit /b 1
+  )
 )
 
-echo Failed to open workout app.
-exit /b 1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -match 'my-workout\\server\.js' } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }"
+
+node "%~dp0server.js"
+echo.
+echo [Server stopped. Exit code %ERRORLEVEL%]
+pause

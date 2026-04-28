@@ -1,5 +1,28 @@
 import { STORAGE_KEYS } from "../constants/defaults.js";
 
+// ── HTTP API storage (preferred when running under server.js) ───────────────
+const apiStorage = {
+  async get(key) {
+    const r = await fetch(`/api/kv/${encodeURIComponent(key)}`);
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(`storage get failed: ${r.status}`);
+    const value = await r.text();
+    return { value };
+  },
+  async set(key, value) {
+    const r = await fetch(`/api/kv/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      headers: { "content-type": "text/plain; charset=utf-8" },
+      body: value,
+    });
+    if (!r.ok) throw new Error(`storage set failed: ${r.status}`);
+  },
+  async delete(key) {
+    const r = await fetch(`/api/kv/${encodeURIComponent(key)}`, { method: "DELETE" });
+    if (!r.ok && r.status !== 404) throw new Error(`storage delete failed: ${r.status}`);
+  },
+};
+
 // ── IndexedDB storage ───────────────────────────────────────────────────────
 const DB_NAME = "home-gym";
 const DB_VERSION = 1;
@@ -71,7 +94,19 @@ function hasIndexedDB() {
   }
 }
 
-// ── Migrate existing localStorage data to IndexedDB (one-time) ──────────────
+// ── Backend selection ────────────────────────────────────────────────────────
+async function detectApi() {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 1500);
+    const r = await fetch("/api/health", { signal: ctrl.signal });
+    clearTimeout(timer);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function migrateFromLocalStorage(target) {
   const migrationKey = "wk-idb-migrated";
   if (localStorage.getItem(migrationKey)) return;
@@ -86,15 +121,61 @@ async function migrateFromLocalStorage(target) {
   localStorage.setItem(migrationKey, "1");
 }
 
-// ── Exported storage instance ───────────────────────────────────────────────
-const useIDB = hasIndexedDB() && !window.storage;
-export const storage = window.storage ?? (useIDB ? idbStorage : localStorageFallback);
+async function migrateFromIndexedDBToApi(target) {
+  const migrationKey = "wk-api-migrated";
+  if (localStorage.getItem(migrationKey)) return;
 
-if (useIDB) {
-  migrateFromLocalStorage(idbStorage).catch((err) =>
-    console.warn("localStorage → IndexedDB migration failed:", err),
-  );
+  if (!hasIndexedDB()) {
+    localStorage.setItem(migrationKey, "1");
+    return;
+  }
+
+  for (const key of Object.values(STORAGE_KEYS)) {
+    try {
+      const existing = await target.get(key);
+      if (existing !== null) continue;
+      const fromIdb = await idbStorage.get(key);
+      if (fromIdb !== null) {
+        await target.set(key, fromIdb.value);
+      }
+    } catch (err) {
+      console.warn("IDB → API migration failed for", key, err);
+    }
+  }
+
+  localStorage.setItem(migrationKey, "1");
 }
+
+async function pickBackend() {
+  if (await detectApi()) {
+    void migrateFromIndexedDBToApi(apiStorage).catch((err) =>
+      console.warn("IndexedDB → API migration failed:", err),
+    );
+    return apiStorage;
+  }
+  if (hasIndexedDB()) {
+    void migrateFromLocalStorage(idbStorage).catch((err) =>
+      console.warn("localStorage → IndexedDB migration failed:", err),
+    );
+    return idbStorage;
+  }
+  return localStorageFallback;
+}
+
+let resolvedBackend = null;
+let backendPromise = null;
+function getBackend() {
+  if (resolvedBackend) return resolvedBackend;
+  if (!backendPromise) backendPromise = pickBackend().then((b) => (resolvedBackend = b));
+  return backendPromise;
+}
+
+// ── Exported storage instance ───────────────────────────────────────────────
+export const storage = window.storage ?? {
+  async get(key) { return (await getBackend()).get(key); },
+  async set(key, value) { return (await getBackend()).set(key, value); },
+  async delete(key) { return (await getBackend()).delete(key); },
+};
 
 let liveSaveTimer = null;
 let pendingLiveSession = null;

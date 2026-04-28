@@ -13,6 +13,15 @@ export const TE = {
   highlight: "#F2E27A",
 };
 
+// Per-split accent colors — used by MonthCalendar postmarks, can be reused
+// in progress charts, quick-start cards, etc. Order matches DEFAULT_PROGRAM.
+export const SPLIT_COLORS = {
+  "upper-a": "#C8501E", // PUSH — house accent
+  "lower-a": "#3B6B4F", // QUAD — deep moss
+  "upper-b": "#1F4E79", // PULL — ink blue
+  "lower-b": "#7A4E8C", // POST — plum
+};
+
 export const ES = {
   shell: {
     background: TE.bg,

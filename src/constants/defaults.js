@@ -4,6 +4,7 @@ export const DEFAULT_PROGRAM = [
     day: "上半身 A",
     subtitle: "槓鈴胸推主項",
     tag: "PUSH",
+    accent: "#C8501E",
     exercises: [
       { name: "槓鈴平板臥推", weight: 40, unit: "kg", step: 2.5, sets: 4, repRange: "6-8", note: "退槓後肩胛收緊、下放至胸下緣，啟動前先吸氣憋住。" },
       { name: "上斜啞鈴臥推", weight: 12, unit: "kg", step: 1, sets: 3, repRange: "8-10", note: "椅背 30-45 度，啞鈴下放至胸口外側。" },
@@ -17,6 +18,7 @@ export const DEFAULT_PROGRAM = [
     day: "下半身 A",
     subtitle: "深蹲主項",
     tag: "QUAD",
+    accent: "#3B6B4F",
     exercises: [
       { name: "槓鈴背蹲", weight: 50, unit: "kg", step: 2.5, sets: 4, repRange: "6-8", note: "槓位高背、蹲至大腿與地面平行，膝蓋跟著腳尖方向。" },
       { name: "腿推機", weight: 80, unit: "kg", step: 5, sets: 3, repRange: "10-12", note: "下放至大腿貼近胸口，避免下背離開椅墊。" },
@@ -30,6 +32,7 @@ export const DEFAULT_PROGRAM = [
     day: "上半身 B",
     subtitle: "划船與下拉",
     tag: "PULL",
+    accent: "#1F4E79",
     exercises: [
       { name: "引體向上", weight: 0, unit: "bw", sets: 4, repRange: "AMRAP", note: "做到力竭，無法完成可改負重輔助機。" },
       { name: "槓鈴俯身划船", weight: 35, unit: "kg", step: 2.5, sets: 4, repRange: "6-8", note: "髖部略屈、背部中立，槓拉至下腹。" },
@@ -43,6 +46,7 @@ export const DEFAULT_PROGRAM = [
     day: "下半身 B",
     subtitle: "硬舉與臀推",
     tag: "POST",
+    accent: "#7A4E8C",
     exercises: [
       { name: "槓鈴硬舉", weight: 60, unit: "kg", step: 2.5, sets: 3, repRange: "5", note: "啟動前肩胛收緊、槓貼脛骨，髖膝同時鎖定。" },
       { name: "槓鈴臀推", weight: 50, unit: "kg", step: 2.5, sets: 3, repRange: "8-10", note: "頂峰停 1 秒，下巴內收避免拱腰。" },
