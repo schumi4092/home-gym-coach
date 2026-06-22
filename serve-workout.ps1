@@ -1,7 +1,7 @@
 param(
   [string]$Root = (Split-Path -Parent $MyInvocation.MyCommand.Path),
-  [int]$StartPort = 8765,
-  [int]$EndPort = 8765
+  [int]$StartPort = 8780,
+  [int]$EndPort = 8799
 )
 
 $ErrorActionPreference = "Stop"

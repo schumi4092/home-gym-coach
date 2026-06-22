@@ -65,12 +65,18 @@ export function EditorialTimer({ sec = 90, autoStartKey = 0 }) {
   useEffect(() => {
     if (autoStartKey !== lastAutoKey.current && autoStartKey > 0) {
       lastAutoKey.current = autoStartKey;
-      startWith(sec);
+      const timer = window.setTimeout(() => startWith(sec), 0);
+      return () => window.clearTimeout(timer);
     }
+    return undefined;
   }, [autoStartKey, sec, startWith]);
 
   useEffect(() => {
-    if (!running && left === null) setTotal(sec);
+    if (!running && left === null) {
+      const timer = window.setTimeout(() => setTotal(sec), 0);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
   }, [sec, running, left]);
 
   return (

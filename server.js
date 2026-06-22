@@ -15,7 +15,7 @@ const ROOT = __dirname;
 const STATIC_ROOT = path.join(ROOT, "dist");
 const DATA_DIR = path.join(ROOT, "data");
 const DATA_FILE = path.join(DATA_DIR, "workout.json");
-const DEFAULT_PORT = Number(process.env.PORT ?? 8765);
+const DEFAULT_PORT = Number(process.env.PORT ?? 8780);
 const HOST = "127.0.0.1";
 
 const MIME = {
@@ -209,7 +209,7 @@ async function tryListen(port) {
       await tryListen(port);
       break;
     } catch (err) {
-      if (err.code === "EADDRINUSE" && port < DEFAULT_PORT + 20) {
+      if ((err.code === "EADDRINUSE" || err.code === "EACCES") && port < DEFAULT_PORT + 20) {
         port += 1;
         continue;
       }

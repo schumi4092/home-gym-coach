@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { T, iconButtonStyle, panelStyle, primaryButtonStyle } from "../constants/theme.js";
-import { hydrateHistoryEntry } from "../utils/workout.js";
+import { hydrateHistoryEntry, normalizeLoad } from "../utils/workout.js";
 import { ExerciseCard } from "../components/ExerciseCard.jsx";
 
 export function HistoryEditor({ entry, programs, onBack, onSave, isDesktop }) {
@@ -14,7 +14,7 @@ export function HistoryEditor({ entry, programs, onBack, onSave, isDesktop }) {
     setDraft((previous) => ({
       ...previous,
       exercises: previous.exercises.map((exercise, index) => (
-        index === exerciseIndex ? { ...exercise, weight: Math.max(0, Math.round(value * 1000) / 1000) } : exercise
+        index === exerciseIndex ? { ...exercise, weight: normalizeLoad(value) } : exercise
       )),
     }));
   };

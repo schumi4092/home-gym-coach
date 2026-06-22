@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { T, panelStyle, pillButtonBaseStyle } from "../constants/theme.js";
 import { calcAvgRpe, formatExerciseLoad, getRpeColor } from "../utils/format.js";
-import { getAdjustedWeight, getDefaultStep, getRestSeconds } from "../utils/workout.js";
+import { getAdjustedWeight, getExerciseStep, getRestSeconds, WEIGHT_STEP_OPTIONS } from "../utils/workout.js";
 import { createCoachingHint } from "../utils/coaching.js";
 import { Timer } from "./Timer.jsx";
 import { SetRow } from "./SetRow.jsx";
@@ -81,17 +81,17 @@ export function ExerciseCard({ exercise, index, onRep, onWeight, onRpe, onStepCh
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: 13, color: T.t3, fontWeight: 500 }}>重量</span>
             <div style={{ display: "inline-flex", alignItems: "center", borderRadius: 8, overflow: "hidden", border: `0.5px solid ${T.border}` }}>
-              <button onClick={() => onWeight(index, getAdjustedWeight(exercise.weight, exercise.step ?? getDefaultStep(exercise.unit), -1))} style={{ ...pillButtonBaseStyle, width: 32, height: 30, padding: 0, borderRadius: 8, border: "none", background: T.bg3, color: T.t2, fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
+              <button onClick={() => onWeight(index, getAdjustedWeight(exercise.weight, getExerciseStep(exercise), -1))} style={{ ...pillButtonBaseStyle, width: 32, height: 30, padding: 0, borderRadius: 8, border: "none", background: T.bg3, color: T.t2, fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
               <div style={{ minWidth: 56, height: 30, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: T.t1, background: T.bg2, padding: "0 4px" }}>
                 {exercise.weight > 0 ? `${exercise.weight} ${exercise.unit}` : "BW"}
               </div>
-              <button onClick={() => onWeight(index, getAdjustedWeight(exercise.weight, exercise.step ?? getDefaultStep(exercise.unit), 1))} style={{ ...pillButtonBaseStyle, width: 32, height: 30, padding: 0, borderRadius: 8, border: "none", background: T.bg3, color: T.t2, fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+              <button onClick={() => onWeight(index, getAdjustedWeight(exercise.weight, getExerciseStep(exercise), 1))} style={{ ...pillButtonBaseStyle, width: 32, height: 30, padding: 0, borderRadius: 8, border: "none", background: T.bg3, color: T.t2, fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
             </div>
             {exercise.unit === "kg" && (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 13, color: T.t3, fontWeight: 500 }}>步進</span>
-                <select value={String(exercise.step ?? 1)} onChange={(event) => onStepChange(index, Number(event.target.value))} style={{ height: 30, borderRadius: 8, border: `0.5px solid ${T.border}`, background: T.bg3, color: T.t1, padding: "0 8px", fontSize: 14 }}>
-                  {[1, 0.5, 0.25, 0.125].map((step) => (
+                <select value={String(getExerciseStep(exercise))} onChange={(event) => onStepChange(index, Number(event.target.value))} style={{ height: 30, borderRadius: 8, border: `0.5px solid ${T.border}`, background: T.bg3, color: T.t1, padding: "0 8px", fontSize: 14 }}>
+                  {WEIGHT_STEP_OPTIONS.map((step) => (
                     <option key={step} value={step}>{step} kg</option>
                   ))}
                 </select>

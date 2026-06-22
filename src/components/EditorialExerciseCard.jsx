@@ -1,7 +1,7 @@
 import { TE, ES } from "../constants/editorial-theme.js";
 import { EditorialSetRow } from "./EditorialSetRow.jsx";
 import { formatExerciseLoad } from "../utils/format.js";
-import { getAdjustedWeight, getSetWeight } from "../utils/workout.js";
+import { getAdjustedWeight, getExerciseStep, getSetWeight, WEIGHT_STEP_OPTIONS } from "../utils/workout.js";
 
 export function EditorialExerciseCard({
   exercise,
@@ -9,6 +9,7 @@ export function EditorialExerciseCard({
   onRep,
   onRpe,
   onWeight,
+  onStepChange,
   onSetWeight,
   onToggleWarmup,
   onAddSet,
@@ -22,7 +23,7 @@ export function EditorialExerciseCard({
   setActiveSet,
 }) {
   const unit = exercise.unit;
-  const step = exercise.step ?? 1;
+  const step = getExerciseStep(exercise);
   const workingSetCount = exercise.reps.filter((_, i) => !exercise.warmup?.[i]).length;
   const warmupCount = exercise.reps.length - workingSetCount;
 
@@ -65,9 +66,30 @@ export function EditorialExerciseCard({
 
       {/* Weight bar */}
       {unit !== "bw" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, padding: "12px 14px", background: TE.surface }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, padding: "12px 14px", background: TE.surface, flexWrap: "wrap" }}>
           <div style={{ ...ES.label }}>Working weight</div>
-          <div style={{ flex: 1 }} />
+          <div style={{ flex: "1 1 24px" }} />
+          {unit === "kg" && onStepChange && (
+            <div style={stepGroup} title="Weight increment">
+              {WEIGHT_STEP_OPTIONS.map((option) => {
+                const active = option === step;
+                return (
+                  <button
+                    key={option}
+                    onClick={() => onStepChange(index, option)}
+                    style={{
+                      ...stepChip,
+                      background: active ? TE.ink : "transparent",
+                      color: active ? TE.bg : TE.ink3,
+                      borderColor: active ? TE.ink : TE.ink4,
+                    }}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <button onClick={() => adjustWeight(-1)} style={stepperBtn}>−</button>
           <div style={{ ...ES.num, fontSize: 28, letterSpacing: "-0.02em", minWidth: 80, textAlign: "center" }}>
             {formatExerciseLoad(exercise.weight, unit)}
@@ -161,6 +183,26 @@ const stepperBtn = {
   cursor: "pointer",
   fontFamily: "'IBM Plex Mono', monospace",
   display: "flex", alignItems: "center", justifyContent: "center",
+};
+
+const stepGroup = {
+  display: "flex",
+  alignItems: "center",
+  gap: 3,
+  paddingRight: 4,
+};
+
+const stepChip = {
+  height: 26,
+  minWidth: 34,
+  padding: "0 7px",
+  border: `1px solid ${TE.ink4}`,
+  background: "transparent",
+  fontFamily: "'IBM Plex Mono', monospace",
+  fontSize: 10,
+  letterSpacing: "0.02em",
+  lineHeight: 1,
+  cursor: "pointer",
 };
 
 const addBtn = {

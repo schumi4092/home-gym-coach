@@ -137,6 +137,22 @@ export function EditorialSetRow({
               }}
             >×</button>
           )}
+          {onToggleWarmup && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleWarmup(); }}
+              title="Toggle warm-up"
+              style={{
+                ...stepBtnBase,
+                width: 34, height: 38,
+                border: `1px solid ${warmup ? TE.ink : TE.ink4}`,
+                background: warmup ? TE.ink : "transparent",
+                color: warmup ? TE.bg : TE.ink4,
+                fontSize: 10,
+                letterSpacing: "0.08em",
+                fontWeight: 700,
+              }}
+            >WU</button>
+          )}
         </div>
       </div>
 

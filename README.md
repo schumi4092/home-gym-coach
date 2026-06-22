@@ -64,7 +64,7 @@ powershell -File make-shortcut.ps1        # 在桌面建立捷徑
 | `npm run dev`（Vite 開發模式）| 瀏覽器 IndexedDB | ❌ 否 |
 | 找不到 Node.js 時的 fallback（`serve-workout.ps1`）| 瀏覽器 IndexedDB | ❌ 否 |
 
-- 走本機檔案模式時，[server.js](server.js) 會在啟動時偵測 `/api/health`，把所有讀寫都導去 `data/workout.json`，**不論用 Edge / Chrome / Brave 開 `http://127.0.0.1:8765` 都讀同一份**
+- 走本機檔案模式時，[server.js](server.js) 會在啟動時偵測 `/api/health`，把所有讀寫都導去 `data/workout.json`，**不論用 Edge / Chrome / Brave 開 `http://127.0.0.1:8780` 都讀同一份**
 - 第一次切到本機檔案模式時，會自動把瀏覽器 IndexedDB 裡的舊紀錄搬進 `workout.json`（每個 origin 觸發一次）
 - 若瀏覽器不支援 IndexedDB，dev / fallback 模式會退回 localStorage
 - `data/workout.json` 是純 JSON，可以直接放進 git / OneDrive / Dropbox 做版本備份
@@ -74,9 +74,9 @@ powershell -File make-shortcut.ps1        # 在桌面建立捷徑
 
 如果之前是用 Brave 跑這個 app，資料卡在 Brave 自己的 IndexedDB 裡，搬過來步驟：
 
-1. **在 Brave 裡**打開原本的網址（例如 `http://127.0.0.1:8765`），右上角點「備份」→ 下載 `home-gym-backup-日期.json`
+1. **在 Brave 裡**打開原本的網址（例如 `http://127.0.0.1:8780`），右上角點「備份」→ 下載 `home-gym-backup-日期.json`
 2. **關掉舊的 PowerShell server**（`open-workout.bat` 對應的視窗）
-3. 雙擊新版 `open-workout.bat`（或執行 `npm run start`），任何瀏覽器打開 `http://127.0.0.1:8765`
+3. 雙擊新版 `open-workout.bat`（或執行 `npm run start`），任何瀏覽器打開 `http://127.0.0.1:8780`
 4. 右上角「匯入備份」→ 選剛剛那個 JSON 檔
 5. 完成。之後用 Edge / Chrome / Brave 哪個都會看到同樣的資料，因為都讀同一個 `data/workout.json`
 
@@ -141,7 +141,7 @@ App 優先使用 IndexedDB，不支援時退回 localStorage。若 `window.stora
 
 ### 伺服器
 
-[server.js](server.js)（Node 內建模組，無外部依賴）是預設的本機 server，監聽 `127.0.0.1:8765`：
+[server.js](server.js)（Node 內建模組，無外部依賴）是預設的本機 server，監聽 `127.0.0.1:8780`：
 - 靜態檔：服務 `dist/`，找不到的路徑 fallback 回 `index.html`（給 SPA 路由）
 - API：`GET /api/health`、`GET|PUT|DELETE /api/kv/:key`、`GET /api/dump`，全部寫入 `data/workout.json`
 - 寫檔用 atomic rename（先寫 `.tmp` 再 rename），避免崩潰時資料毀損
@@ -149,7 +149,7 @@ App 優先使用 IndexedDB，不支援時退回 localStorage。若 `window.stora
 
 `serve-workout.ps1` 是舊的 PowerShell HTTP 伺服器，保留作為 Node.js 不在 PATH 時的 fallback，但只能服務靜態檔，不提供 `/api/*`。
 
-Vite dev server 也強制綁在 `127.0.0.1:8765`（`vite.config.js` 裡的 `server.strictPort`），確保開發版能直接讀到打包版的 IndexedDB 舊資料。跑 `npm run dev` 前請確認 `open-workout.bat` 的 server 已關閉。
+Vite dev server 也強制綁在 `127.0.0.1:8780`（`vite.config.js` 裡的 `server.strictPort`），確保開發版能直接讀到打包版的 IndexedDB 舊資料。跑 `npm run dev` 前請確認 `open-workout.bat` 的 server 已關閉。
 
 ---
 
@@ -188,7 +188,7 @@ Vite dev server 也強制綁在 `127.0.0.1:8765`（`vite.config.js` 裡的 `serv
 - 休息計時器自動起跳：完成一組有效 reps 時自動倒數
 - 課中動作替換：從常用庫選擇或自訂新動作
 - Logo 重新設計為編輯風格槓鈴標記
-- Vite dev server 綁定 `127.0.0.1:8765`，與打包版共用 IndexedDB 資料
+- Vite dev server 綁定 `127.0.0.1:8780`，與打包版共用 IndexedDB 資料
 
 ### v0.2.0
 - IndexedDB 儲存：取代 localStorage，容量大幅提升，自動遷移舊資料
@@ -212,7 +212,7 @@ Vite dev server 也強制綁在 `127.0.0.1:8765`（`vite.config.js` 裡的 `serv
 
 ```bash
 npm install
-npm run dev            # http://127.0.0.1:8765 (Vite, IndexedDB 儲存)
+npm run dev            # http://127.0.0.1:8780 (Vite, IndexedDB 儲存)
 npm run build          # 輸出到 dist/
 npm run serve          # node server.js（靜態 + API + 本機檔案儲存，要先 build）
 npm run start          # build + serve 一鍵

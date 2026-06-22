@@ -38,7 +38,7 @@ if errorlevel 1 (
   echo [!] Node.js not found in PATH. Falling back to the legacy PowerShell server.
   echo.
   powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -match 'serve-workout\.ps1' } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }"
-  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0serve-workout.ps1" -Root "%~dp0dist" -StartPort 8765 -EndPort 8765
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0serve-workout.ps1" -Root "%~dp0dist" -StartPort 8780 -EndPort 8799
   echo.
   echo [Legacy server stopped. Exit code %ERRORLEVEL%]
   pause

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { TE, ES, primaryBtn, secondaryBtn, editStepBtn } from "../constants/editorial-theme.js";
-import { hydrateHistoryEntry } from "../utils/workout.js";
+import { getAdjustedWeight, getExerciseStep, hydrateHistoryEntry, normalizeLoad } from "../utils/workout.js";
 
 const numInputStyle = {
   width: 56,
@@ -26,7 +26,7 @@ export function EditorialHistoryEditor({ entry, programs, onBack, onSave }) {
     setDraft((prev) => ({
       ...prev,
       exercises: prev.exercises.map((ex, i) => (
-        i === exIdx ? { ...ex, weight: Math.max(0, Math.round(value * 1000) / 1000) } : ex
+        i === exIdx ? { ...ex, weight: normalizeLoad(value) } : ex
       )),
     }));
   };
@@ -77,6 +77,14 @@ export function EditorialHistoryEditor({ entry, programs, onBack, onSave }) {
     setDraft((prev) => ({ ...prev, sessionNote: note }));
   };
 
+  const matchedProgram = programs.find((p) => p.id === draft.dayId);
+
+  const reassignProgram = (programId) => {
+    const program = programs.find((p) => p.id === programId);
+    if (!program) return;
+    setDraft((prev) => ({ ...prev, dayId: program.id, day: program.day, tag: program.tag }));
+  };
+
   return (
     <div style={ES.shell}>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
@@ -114,6 +122,38 @@ export function EditorialHistoryEditor({ entry, programs, onBack, onSave }) {
           <span style={{ fontWeight: 600, color: TE.accent }}>NOTE</span>
           <span>編輯歷史紀錄不會影響目前進行中的訓練。</span>
         </div>
+
+        <section style={{ marginBottom: 22 }}>
+          <div style={{ ...ES.label, marginBottom: 8 }}>
+            課表 · Program {!matchedProgram && (
+              <span style={{ color: TE.accent }}>（目前未對應任何課表，請重新指定）</span>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <select
+              value={matchedProgram ? draft.dayId : ""}
+              onChange={(e) => reassignProgram(e.target.value)}
+              style={{
+                background: TE.surface,
+                border: `1px solid ${matchedProgram ? TE.ink4 : TE.accent}`,
+                color: TE.ink,
+                padding: "8px 12px",
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 13,
+                outline: "none",
+                minWidth: 240,
+              }}
+            >
+              {!matchedProgram && <option value="" disabled>— 選擇課表 —</option>}
+              {programs.map((p) => (
+                <option key={p.id} value={p.id}>{p.tag} · {p.day}</option>
+              ))}
+            </select>
+            <span style={{ ...ES.mono, fontSize: 11, color: TE.ink3, letterSpacing: "0.04em" }}>
+              變更課表只會修正月曆上的歸屬，不會改動已記錄的動作內容。
+            </span>
+          </div>
+        </section>
 
         <section style={{ marginBottom: 22 }}>
           <div style={{ ...ES.label, marginBottom: 8 }}>Session Note</div>
@@ -158,6 +198,7 @@ export function EditorialHistoryEditor({ entry, programs, onBack, onSave }) {
 
 function ExerciseEditBlock({ exercise, exIdx, onWeight, onRep, onRpe, onToggleWarmup, onNote }) {
   const isWeighted = exercise.unit === "kg";
+  const step = getExerciseStep(exercise);
 
   return (
     <article style={{ background: TE.surface, border: `1px solid ${TE.ink}`, padding: "18px 18px 16px" }}>
@@ -174,12 +215,12 @@ function ExerciseEditBlock({ exercise, exIdx, onWeight, onRep, onRpe, onToggleWa
       {isWeighted && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <span style={ES.label}>Weight</span>
-          <button onClick={() => onWeight(exIdx, Math.max(0, exercise.weight - (exercise.step ?? 2.5)))} style={editStepBtn}>−</button>
+          <button onClick={() => onWeight(exIdx, getAdjustedWeight(exercise.weight, step, -1))} style={editStepBtn}>−</button>
           <div style={{ ...ES.num, fontSize: 24, minWidth: 64, textAlign: "center" }}>
             {exercise.weight}
             <span style={{ fontSize: 11, color: TE.ink3, marginLeft: 4, fontFamily: "'IBM Plex Mono', monospace" }}>{exercise.unit}</span>
           </div>
-          <button onClick={() => onWeight(exIdx, exercise.weight + (exercise.step ?? 2.5))} style={editStepBtn}>+</button>
+          <button onClick={() => onWeight(exIdx, getAdjustedWeight(exercise.weight, step, 1))} style={editStepBtn}>+</button>
         </div>
       )}
 

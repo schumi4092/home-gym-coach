@@ -5,10 +5,10 @@ import { TE, ES, SPLIT_COLORS } from "./constants/editorial-theme.js";
 import { storage, persistLiveWorkout, persistLiveWorkoutDebounced, flushLiveWorkout, clearLiveWorkout } from "./storage/index.js";
 import { formatLocalDate, parseLocalDate } from "./utils/format.js";
 import { buildDashboardStats } from "./utils/dashboard.js";
-import { checkDeloadSuggestion } from "./utils/coaching.js";
+import { buildExerciseHistoryMap, checkDeloadSuggestion } from "./utils/coaching.js";
 import { exportToMarkdown, exportBackup, importBackup } from "./utils/export.js";
 import { normalizeHistory } from "./utils/history.js";
-import { createWorkoutSession, normalizeWorkoutSession, getDefaultStep } from "./utils/workout.js";
+import { createWorkoutSession, normalizeLoad, normalizeWorkoutSession, getExerciseStep } from "./utils/workout.js";
 import { EditorialHome } from "./views/EditorialHome.jsx";
 import { EditorialWorkout } from "./views/EditorialWorkout.jsx";
 
@@ -96,11 +96,12 @@ export default function EditorialApp() {
   const startWorkout = useCallback((id) => {
     const program = programs.find((item) => item.id === id);
     if (!program) return;
-    const newSession = createWorkoutSession(program);
+    const historyMap = buildExerciseHistoryMap(history);
+    const newSession = createWorkoutSession(program, historyMap);
     setWorkoutSession(newSession);
     void persistLiveWorkout(newSession);
     setView("workout");
-  }, [programs]);
+  }, [programs, history]);
 
   const updateRep = useCallback((exerciseIndex, setIndex, value) => {
     setWorkoutAndSave((previous) => ({
@@ -175,7 +176,7 @@ export default function EditorialApp() {
         const insertAt = position === "start" ? 0 : exercise.reps.length;
         const insert = (arr, value) => [...arr.slice(0, insertAt), value, ...arr.slice(insertAt)];
         const defaultWarmupWeight = warmup && exercise.unit !== "bw"
-          ? Math.max(0, Math.round(exercise.weight * 0.5 * 100) / 100)
+          ? normalizeLoad(exercise.weight * 0.5)
           : null;
         return {
           ...exercise,
@@ -231,7 +232,7 @@ export default function EditorialApp() {
         sets,
         repRange: replacement.repRange ?? "8-12",
         note: replacement.note ?? "",
-        step: replacement.step ?? getDefaultStep(replacement.unit ?? "kg"),
+        step: getExerciseStep(replacement),
         reps: new Array(sets).fill(0),
         rpe: new Array(sets).fill(0),
         warmup: new Array(sets).fill(false),
@@ -278,9 +279,12 @@ export default function EditorialApp() {
 
     const nextHistory = normalizeHistory([entry, ...history]);
     setHistory(nextHistory);
+    const nextPrograms = syncProgramsWithCompletedWorkout(programs, workoutSession);
+    setPrograms(nextPrograms);
 
     try {
       await storage.set(STORAGE_KEYS.history, JSON.stringify(nextHistory));
+      await storage.set(STORAGE_KEYS.program, JSON.stringify(nextPrograms));
     } catch (error) {
       console.error("Failed to save history", error);
     }
@@ -288,7 +292,7 @@ export default function EditorialApp() {
     await clearLiveWorkout();
     setWorkoutSession(null);
     setView("home");
-  }, [history, workoutSession]);
+  }, [history, programs, workoutSession]);
 
   const addHistoryEntry = useCallback(async (date, programId) => {
     const program = programs.find((p) => p.id === programId);
@@ -528,6 +532,34 @@ export default function EditorialApp() {
       />
     </div>
   );
+}
+
+function syncProgramsWithCompletedWorkout(programs, session) {
+  return programs.map((program) => {
+    if (program.id !== session.dayId && program.id !== session.id) return program;
+
+    const completedByName = new Map();
+    for (const exercise of session.exercises) {
+      const hasWorkingReps = exercise.reps?.some((rep, index) => rep > 0 && !exercise.warmup?.[index]);
+      if (hasWorkingReps) completedByName.set(exercise.name, exercise);
+    }
+
+    if (completedByName.size === 0) return program;
+
+    return {
+      ...program,
+      exercises: program.exercises.map((exercise) => {
+        const completed = completedByName.get(exercise.name);
+        if (!completed || completed.unit === "bw") return exercise;
+
+        return {
+          ...exercise,
+          weight: normalizeLoad(completed.weight),
+          step: getExerciseStep(completed),
+        };
+      }),
+    };
+  });
 }
 
 function EditorialNav({ view, setView }) {

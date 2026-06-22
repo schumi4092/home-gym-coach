@@ -13,6 +13,7 @@ export function EditorialWorkout({
   onUpdateRep,
   onUpdateRpe,
   onUpdateWeight,
+  onUpdateStep,
   onUpdateSetWeight,
   onToggleWarmup,
   onAddSet: rawAddSet,
@@ -49,7 +50,11 @@ export function EditorialWorkout({
         .join(" · ")
     : null;
   const lastSummaryText = currentHint?.latest
-    ? `上次 ${formatExerciseLoad(currentHint.latest.weight, currentHint.latest.unit)}，做了 ${currentHint.latest.reps.join("/")}。`
+    ? (currentHint.latest.variedWeights && currentHint.latest.setWeights
+        ? `上次各組：${currentHint.latest.setWeights
+            .map((w, i) => `${formatExerciseLoad(w, currentHint.latest.unit)}×${currentHint.latest.reps[i]}`)
+            .join("、")}。`
+        : `上次 ${formatExerciseLoad(currentHint.latest.weight, currentHint.latest.unit)}，做了 ${currentHint.latest.reps.join("/")}。`)
     : null;
   const coachNote = useMemo(
     () => currentExercise ? createCoachingHint(currentExercise, currentHint?.latest, currentHint?.best) : null,
@@ -186,6 +191,7 @@ export function EditorialWorkout({
               onRep={handleRep}
               onRpe={onUpdateRpe}
               onWeight={onUpdateWeight}
+              onStepChange={onUpdateStep}
               onSetWeight={onUpdateSetWeight}
               onToggleWarmup={onToggleWarmup}
               onAddSet={onAddSet}

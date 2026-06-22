@@ -87,11 +87,12 @@ export default function App() {
   const startWorkout = useCallback((id) => {
     const program = programs.find((item) => item.id === id);
     if (!program) return;
-    const newSession = createWorkoutSession(program);
+    const historyMap = buildExerciseHistoryMap(history);
+    const newSession = createWorkoutSession(program, historyMap);
     setWorkoutSession(newSession);
     void persistLiveWorkout(newSession);
     setView("workout");
-  }, [programs]);
+  }, [programs, history]);
 
   const updateRep = useCallback((exerciseIndex, setIndex, value) => {
     setWorkoutAndSave((previous) => ({

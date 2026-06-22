@@ -1,23 +1,71 @@
 import { calcAvgRpe, parseRepRange, formatExerciseLoad, isLocalDateWithinDays } from "./format.js";
-import { getDefaultStep } from "./workout.js";
+import { getExerciseStep } from "./workout.js";
+
+// Signals we try to read out of the free-text notes you write during a session.
+// Patterns cover the Chinese + English phrasing that actually shows up in history.
+const NOTE_PATTERNS = {
+  fatigue: [
+    /熬夜|沒睡|睡不|失眠/,
+    /狀況不[佳好]|狀態不[好佳]|沒精神|沒力/,
+    /好累|很累|疲勞|疲憊|累爆/,
+    /生病|感冒|不舒服/,
+    /小?降.{0,3}重|降一?點|減重|降強度/,
+    /tired|sleepy|exhausted|fatigue|drained|sick|run[- ]?down/i,
+  ],
+  soreness: [
+    /痠|酸|痛|拉傷|緊繃|發炎|卡卡|怪怪/,
+    /sore|pain|tight|strain|ache|achy|clicky|tweak|niggle/i,
+  ],
+  breathing: [
+    /喘|上氣不接下氣|喘不過|心跳很快/,
+    /breath|winded|cardio|gass?ed|out of breath/i,
+  ],
+  missed: [
+    /做不[完動起]|沒做完|力竭|撐不住|掉速|只做了?|差一?點|沒達標/,
+    /fail|missed|couldn'?t|fell short/i,
+  ],
+};
+
+export function classifyNote(text) {
+  const t = (text || "").trim();
+  const flags = { fatigue: false, soreness: false, breathing: false, missed: false };
+  if (!t) return flags;
+  for (const [key, patterns] of Object.entries(NOTE_PATTERNS)) {
+    flags[key] = patterns.some((re) => re.test(t));
+  }
+  return flags;
+}
 
 export function buildExerciseHistoryMap(history) {
   const map = {};
 
   for (const entry of history) {
     for (const exercise of entry.exercises) {
-      const completedReps = exercise.reps.filter((rep, i) => rep > 0 && !exercise.warmup?.[i]);
-      if (completedReps.length === 0) continue;
+      const completed = exercise.reps
+        .map((rep, i) => ({ rep, i }))
+        .filter(({ rep, i }) => rep > 0 && !exercise.warmup?.[i]);
+      if (completed.length === 0) continue;
 
+      const completedReps = completed.map((c) => c.rep);
+      // Resolve the actual weight per working set: a per-set override wins, else the base weight.
+      const setWeights = completed.map((c) => {
+        const w = exercise.setWeights?.[c.i];
+        return Number.isFinite(w) ? w : exercise.weight;
+      });
       const workingRpes = (exercise.rpe || []).filter((_, i) => !exercise.warmup?.[i]);
       const exerciseSummary = {
         date: entry.date,
         weight: exercise.weight,
         unit: exercise.unit,
         reps: completedReps,
+        setWeights,
+        topWeight: Math.max(...setWeights),
+        variedWeights: new Set(setWeights).size > 1,
         maxRep: Math.max(...completedReps),
         totalReps: completedReps.reduce((sum, rep) => sum + rep, 0),
         avgRpe: calcAvgRpe(workingRpes),
+        exerciseNote: (exercise.exerciseNote || "").trim(),
+        sessionNote: (entry.sessionNote || "").trim(),
       };
 
       if (!map[exercise.name]) {
@@ -114,66 +162,130 @@ export function createCoachingHint(exercise, latestHint, bestHint) {
   const previousWeight = latestHint.weight;
   const weightDiff = Math.round((currentWeight - previousWeight) * 100) / 100;
 
-  const suggestedIncrease = exercise.step ?? getDefaultStep(exercise.unit);
+  const suggestedIncrease = getExerciseStep(exercise);
+  const increaseText = formatIncreaseText(exercise, suggestedIncrease);
   const recentFatigue = latestHint.recent?.filter((item) => item.avgRpe >= 9).length ?? 0;
 
-  if (recentFatigue >= 2) {
+  // ── Note-aware signals ──────────────────────────────────────────────────────
+  const lastNote = latestHint.exerciseNote || "";
+  const lastConditionText = [latestHint.exerciseNote, latestHint.sessionNote].filter(Boolean).join("；");
+  const lastFlags = classifyNote(lastConditionText);
+  const liveFlags = classifyNote(exercise.exerciseNote || "");
+
+  // Soreness / pain you logged last time comes before any progression talk.
+  if (lastFlags.soreness) {
     return {
-      headline: "強度偏高，注意疲勞",
-      detail: `最近 ${recentFatigue} 次這個動作的平均 RPE 都在 9 以上。下次可考慮先維持重量，甚至減少 1 組或小降重量，讓恢復跟上。`,
+      headline: "先確認身體狀況",
+      detail: `你上次記了：「${lastNote || latestHint.sessionNote}」。今天先做足熱身、確認沒有不適再決定加量；若是單側或關節的感覺，左右分開觀察，必要時這個動作先降一點重量。`,
     };
   }
 
-  if (type === "amrap") {
-    if (avgRpe >= 9 && latestHint.maxRep >= 6) {
+  const base = (() => {
+    if (recentFatigue >= 2) {
       return {
-        headline: "可以小幅加重",
-        detail: `上次 AMRAP 做到 ${latestHint.reps.join("/")}，而且強度已經很高。下次可以加 ${suggestedIncrease}${exercise.unit}，或維持體重但把每組目標拉到 6 下以上。`,
+        headline: "強度偏高，注意疲勞",
+        detail: `最近 ${recentFatigue} 次這個動作的平均 RPE 都在 9 以上。下次可考慮先維持重量，甚至減少 1 組或小降重量，讓恢復跟上。`,
       };
     }
-    return {
-      headline: "先把總次數撐高",
-      detail: `上次做了 ${latestHint.reps.join("/")}。先專注把總次數往上推，等你能更穩定地做到 6 下以上，再考慮加重。`,
-    };
-  }
 
-  if (allSetsAtMax && avgRpe > 0 && avgRpe <= 8.5) {
-    return {
-      headline: "表現很穩，可以加重",
-      detail: `上次 ${formatExerciseLoad(previousWeight, latestHint.unit)} 已經把 ${completedSets} 組都做到區間上緣，平均 RPE ${avgRpe}。下次建議加 ${suggestedIncrease}${exercise.unit}。`,
-    };
-  }
+    if (type === "amrap") {
+      if (avgRpe >= 9 && latestHint.maxRep >= 6) {
+        return {
+          headline: "可以小幅加重",
+          detail: exercise.unit === "bw"
+            ? `上次 AMRAP 做到 ${latestHint.reps.join("/")}，而且強度已經很高。下次可以維持體重、每組多拚 1 下；如果器材允許，也可以開始小幅負重。`
+            : `上次 AMRAP 做到 ${latestHint.reps.join("/")}，而且強度已經很高。下次可以加 ${increaseText}，或先維持重量把每組目標拉到 6 下以上。`,
+        };
+      }
+      return {
+        headline: "先把總次數撐高",
+        detail: `上次做了 ${latestHint.reps.join("/")}。先專注把總次數往上推，等你能更穩定地做到 6 下以上，再考慮加重。`,
+      };
+    }
 
-  if (allSetsAtOrAboveMin && avgRpe >= 9.5) {
-    return {
-      headline: "先維持重量",
-      detail: `你上次有達到基本目標，但平均 RPE ${avgRpe} 偏高。下次先維持 ${formatExerciseLoad(previousWeight, latestHint.unit)}，把動作穩定度和餘裕拉回來。`,
-    };
-  }
+    if (weightDiff > 0) {
+      return {
+        headline: "新重量先觀察",
+        detail: `你現在比上次多了 ${weightDiff} ${exercise.unit}。這次先確認 reps 和動作品質能不能站穩，再決定下次要不要繼續加。`,
+      };
+    }
 
-  if (!allSetsAtOrAboveMin && min) {
-    return {
-      headline: "先補齊下限 reps",
-      detail: `上次做了 ${latestHint.reps.join("/")}，還沒全部進到 ${min}-${max} 的目標區。下次先維持 ${formatExerciseLoad(previousWeight, latestHint.unit)}，目標把每組都補到至少 ${min} 下。`,
-    };
-  }
+    if (weightDiff < 0 && exercise.unit !== "bw") {
+      // You already flagged a rough day in today's note — treat the drop as intentional, not a mistake.
+      if (liveFlags.fatigue) {
+        return {
+          headline: "狀態調整，沒問題",
+          detail: `你今天記了狀態不在巔峰，小降重量是合理的選擇。把動作做穩、控制好離心就好；等狀態回來再回到 ${formatExerciseLoad(previousWeight, latestHint.unit)}。`,
+        };
+      }
+      return {
+        headline: "重量低於上次",
+        detail: `你現在比上次少了 ${Math.abs(weightDiff)} ${exercise.unit}。如果這不是刻意降重，可以先檢查是不是課表起始重量還沒更新；狀態正常的話，下次可回到 ${formatExerciseLoad(previousWeight, latestHint.unit)}。`,
+      };
+    }
 
-  if (weightDiff > 0 && avgRpe >= 9) {
-    return {
-      headline: "新重量先適應",
-      detail: `你現在比上次多了 ${weightDiff} ${exercise.unit}，而且上次平均 RPE ${avgRpe}。這次先把 reps 穩住，不急著再加。`,
-    };
-  }
+    // Last session's RPE was inflated by a documented off day — don't read it as a true ceiling.
+    if (lastFlags.fatigue && avgRpe >= 9) {
+      return {
+        headline: "上次是辛苦的一天",
+        detail: `上次你記了狀態不好，那天平均 RPE ${avgRpe} 偏高很正常，先別當成已經到頂。今天若恢復了就照原節奏推進；還是覺得累的話，先穩住 ${formatExerciseLoad(previousWeight, latestHint.unit)} 把品質顧好。`,
+      };
+    }
 
-  if (bestHint && bestHint.weight === latestHint.weight && bestHint.maxRep === latestHint.maxRep) {
-    return {
-      headline: "離突破很近",
-      detail: `現在已經貼近你的最佳表現 ${formatExerciseLoad(bestHint.weight, bestHint.unit)} x ${bestHint.maxRep}。下次可以挑一組多做 1 下，或把全部組數做得更平均。`,
-    };
-  }
+    if (allSetsAtMax && avgRpe > 0 && avgRpe <= 8.5) {
+      return {
+        headline: "表現很穩，可以加重",
+        detail: exercise.unit === "bw"
+          ? `上次已經把 ${completedSets} 組都做到區間上緣，平均 RPE ${avgRpe}。下次可以每組多做 1 下，或把動作節奏控制得更穩。`
+          : `上次 ${formatExerciseLoad(previousWeight, latestHint.unit)} 已經把 ${completedSets} 組都做到區間上緣，平均 RPE ${avgRpe}。下次建議加 ${increaseText}。`,
+      };
+    }
 
-  return {
-    headline: "維持節奏往上推",
-    detail: `上次做了 ${latestHint.reps.join("/")}，平均 RPE ${avgRpe || "-"}。下次先維持 ${formatExerciseLoad(previousWeight, latestHint.unit)}，優先讓組數表現更整齊。`,
-  };
+    if (allSetsAtOrAboveMin && avgRpe >= 9.5) {
+      return {
+        headline: "先維持重量",
+        detail: `你上次有達到基本目標，但平均 RPE ${avgRpe} 偏高。下次先維持 ${formatExerciseLoad(previousWeight, latestHint.unit)}，把動作穩定度和餘裕拉回來。`,
+      };
+    }
+
+    if (!allSetsAtOrAboveMin && min) {
+      // Missing reps + a "good run" feel ⇒ conditioning, not strength, was the limiter.
+      if (lastFlags.breathing) {
+        return {
+          headline: "卡在喘，不是卡在力量",
+          detail: `上次有幾組沒進到 ${min}-${max}，但你記到的是「喘」而不是推不動。下次組間多休息 30-60 秒，先把每組補到 ${min} 下；重量先別動。`,
+        };
+      }
+      return {
+        headline: "先補齊下限 reps",
+        detail: `上次做了 ${latestHint.reps.join("/")}，還沒全部進到 ${min}-${max} 的目標區。下次先維持 ${formatExerciseLoad(previousWeight, latestHint.unit)}，目標把每組都補到至少 ${min} 下。`,
+      };
+    }
+
+    if (bestHint && bestHint.weight === latestHint.weight && bestHint.maxRep === latestHint.maxRep) {
+      return {
+        headline: "離突破很近",
+        detail: `現在已經貼近你的最佳表現 ${formatExerciseLoad(bestHint.weight, bestHint.unit)} x ${bestHint.maxRep}。下次可以挑一組多做 1 下，或把全部組數做得更平均。`,
+      };
+    }
+
+    return {
+      headline: "維持節奏往上推",
+      detail: `上次做了 ${latestHint.reps.join("/")}，平均 RPE ${avgRpe || "-"}。下次先維持 ${formatExerciseLoad(previousWeight, latestHint.unit)}，優先讓組數表現更整齊。`,
+    };
+  })();
+
+  return maybeEchoNote(base, lastNote);
+}
+
+// Surface your own note back to you, unless the chosen hint already quotes it.
+function maybeEchoNote(hint, note) {
+  const n = (note || "").trim();
+  if (!n || hint.detail.includes(n)) return hint;
+  return { ...hint, detail: `你上次記了：「${n}」。${hint.detail}` };
+}
+
+function formatIncreaseText(exercise, step) {
+  if (exercise.unit === "sec") return `${step} 秒`;
+  return `${step}${exercise.unit}`;
 }

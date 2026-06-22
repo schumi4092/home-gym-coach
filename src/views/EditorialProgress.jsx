@@ -45,13 +45,14 @@ export function EditorialProgress({ history, onExit, onEdit, onDelete }) {
   }, [activeName, history]);
 
   const dataWithPr = useMemo(() => {
-    let bestScore = 0;
-    return data.map((point) => {
+    return data.reduce((acc, point) => {
       const score = (point.weight || 0) * point.topReps;
-      const pr = score > bestScore;
-      if (pr) bestScore = score;
-      return { ...point, pr };
-    });
+      const pr = score > acc.bestScore;
+      return {
+        bestScore: pr ? score : acc.bestScore,
+        points: [...acc.points, { ...point, pr }],
+      };
+    }, { bestScore: 0, points: [] }).points;
   }, [data]);
 
   const latest = dataWithPr[dataWithPr.length - 1];

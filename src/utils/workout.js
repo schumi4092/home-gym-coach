@@ -3,14 +3,45 @@ import { T } from "../constants/theme.js";
 import { getDaysSinceLocalDate } from "./format.js";
 import { sortHistoryDescending } from "./history.js";
 
-export function getDefaultStep(unit) {
-  if (unit === "kg") return 1;
+export function getDefaultStep(unit, weight = 0) {
+  if (unit === "kg") {
+    const normalizedWeight = normalizeLoad(weight);
+    const fractional = normalizedWeight % 1;
+    if (fractional === 0.25 || fractional === 0.75) return 0.25;
+    if (fractional === 0.5) return 0.5;
+    return 1;
+  }
   if (unit === "sec") return 5;
   return 1;
 }
 
+export const WEIGHT_STEP_OPTIONS = [5, 2.5, 1, 0.5, 0.25, 0.125];
+
+export function normalizeLoad(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.round(numeric * 1000) / 1000);
+}
+
 export function getAdjustedWeight(weight, step, direction) {
-  return Math.max(0, Math.round((weight + direction * step) * 100) / 100);
+  const safeWeight = Number.isFinite(Number(weight)) ? Number(weight) : 0;
+  const safeStep = Number.isFinite(Number(step)) && Number(step) > 0 ? Number(step) : 1;
+  return normalizeLoad(safeWeight + direction * safeStep);
+}
+
+export function getExerciseStep(exercise) {
+  const storedStep = Number(exercise?.step);
+  const inferredStep = getDefaultStep(exercise?.unit, exercise?.weight);
+
+  if (!Number.isFinite(storedStep) || storedStep <= 0) return inferredStep;
+
+  // Older live sessions stored every kg movement as step 1. If the load is
+  // already fractional, prefer the smallest step that can reproduce it.
+  if (exercise?.unit === "kg" && storedStep === 1 && inferredStep < storedStep) {
+    return inferredStep;
+  }
+
+  return storedStep;
 }
 
 export function calculateRepMax(range) {
@@ -33,7 +64,8 @@ export function normalizeWorkoutSession(session) {
       const sets = exercise.sets ?? (exercise.reps?.length ?? 1);
       return {
         ...exercise,
-        step: exercise.step ?? getDefaultStep(exercise.unit),
+        weight: normalizeLoad(exercise.weight),
+        step: getExerciseStep(exercise),
         reps: exercise.reps ?? new Array(sets).fill(0),
         rpe: exercise.rpe ?? new Array(sets).fill(0),
         warmup: Array.isArray(exercise.warmup) && exercise.warmup.length === sets
@@ -53,15 +85,21 @@ export function getSetWeight(exercise, setIndex) {
   return override == null ? exercise.weight : override;
 }
 
-export function createWorkoutSession(program) {
+export function createWorkoutSession(program, historyMap) {
   return normalizeWorkoutSession({
     ...program,
     startTime: Date.now(),
     sessionNote: "",
-    exercises: program.exercises.map((exercise) => ({
-      ...exercise,
-      step: getDefaultStep(exercise.unit),
-    })),
+    exercises: program.exercises.map((exercise) => {
+      const latest = historyMap?.[exercise.name]?.latest;
+      const useLatest = latest && latest.unit === exercise.unit && Number.isFinite(latest.weight);
+      const resolvedWeight = useLatest ? latest.weight : exercise.weight;
+      return {
+        ...exercise,
+        weight: normalizeLoad(resolvedWeight),
+        step: getExerciseStep({ ...exercise, weight: resolvedWeight }),
+      };
+    }),
   });
 }
 
@@ -100,7 +138,8 @@ export function hydrateHistoryEntry(entry, programs) {
         sets,
         repRange: matchedExercise?.repRange ?? "8-12",
         note: matchedExercise?.note ?? "",
-        step: exercise.step ?? getDefaultStep(exercise.unit),
+        weight: normalizeLoad(exercise.weight),
+        step: getExerciseStep(exercise),
         reps: exercise.reps ?? new Array(sets).fill(0),
         rpe: exercise.rpe ?? new Array(sets).fill(0),
         warmup: Array.isArray(exercise.warmup) && exercise.warmup.length === sets

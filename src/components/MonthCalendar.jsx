@@ -8,9 +8,17 @@ import { useMemo, useState } from "react";
 // postmark. Today gets a corner ribbon. Out-of-month cells render blank.
 export function MonthCalendar({ history, today, programs, onEditHistory, onAddHistory }) {
   const [pickerDate, setPickerDate] = useState(null);
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const monthLabel = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const [view, setView] = useState(() => ({ year: today.getFullYear(), month: today.getMonth() }));
+  const { year, month } = view;
+  const monthLabel = new Date(year, month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
+
+  const goPrevMonth = () =>
+    setView(({ year, month }) => (month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 }));
+  const goNextMonth = () =>
+    setView(({ year, month }) => (month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 }));
+  const goToday = () => setView({ year: today.getFullYear(), month: today.getMonth() });
 
   const programById = useMemo(
     () => Object.fromEntries(programs.map((p) => [p.id, p])),
@@ -21,6 +29,7 @@ export function MonthCalendar({ history, today, programs, onEditHistory, onAddHi
     const firstDow = new Date(year, month, 1).getDay();
     const offset = (firstDow + 6) % 7; // Monday-first
     const days = new Date(year, month + 1, 0).getDate();
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
     const trainedMap = {};
     history.forEach((entry, idx) => {
@@ -49,8 +58,8 @@ export function MonthCalendar({ history, today, programs, onEditHistory, onAddHi
         day: d,
         records,
         tags,
-        isToday: d === today.getDate(),
-        isFuture: d > today.getDate(),
+        isToday: isCurrentMonth && d === today.getDate(),
+        isFuture: new Date(year, month, d) > todayMidnight,
         isWeekend: dow >= 5,
       });
     }
@@ -61,7 +70,7 @@ export function MonthCalendar({ history, today, programs, onEditHistory, onAddHi
       daysInMonth: days,
       trainedCount: Object.keys(trainedMap).length,
     };
-  }, [history, year, month, programById, today]);
+  }, [history, year, month, programById, today, isCurrentMonth]);
 
   const dows = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -81,8 +90,22 @@ export function MonthCalendar({ history, today, programs, onEditHistory, onAddHi
         gap: 12, flexWrap: "wrap",
       }}>
         <div>
-          <div style={{ ...ES.label, marginBottom: 6 }}>
-            Stamp sheet · {monthLabel.toUpperCase()}
+          <div style={{ ...ES.label, marginBottom: 6, display: "flex", alignItems: "center", gap: 10 }}>
+            <NavButton onClick={goPrevMonth} title="Previous month">‹</NavButton>
+            <span>Stamp sheet · {monthLabel.toUpperCase()}</span>
+            <NavButton onClick={goNextMonth} disabled={isCurrentMonth} title="Next month">›</NavButton>
+            {!isCurrentMonth && (
+              <button
+                onClick={goToday}
+                title="Back to current month"
+                style={{
+                  ...ES.mono, fontSize: 9, letterSpacing: "0.12em", color: TE.accent,
+                  background: "transparent", border: 0, cursor: "pointer", padding: 0,
+                }}
+              >
+                TODAY
+              </button>
+            )}
           </div>
           <h2 style={{ ...ES.num, fontSize: 26, margin: 0, letterSpacing: "-0.02em", lineHeight: 1, fontWeight: 500 }}>
             <em style={{ fontStyle: "italic" }}>{trainedCount}</em>
@@ -154,10 +177,35 @@ export function MonthCalendar({ history, today, programs, onEditHistory, onAddHi
   );
 }
 
+function NavButton({ onClick, disabled, title, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        ...ES.num, fontSize: 18, lineHeight: 1,
+        width: 22, height: 22, display: "inline-flex",
+        alignItems: "center", justifyContent: "center",
+        background: "transparent", border: `1px solid ${TE.rule}`,
+        color: disabled ? TE.ink4 : TE.ink,
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.4 : 1,
+        padding: 0,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function StampCell({ cell, year, month, onEditHistory, onRequestAdd }) {
   const { day, records, tags, isToday, isFuture, isWeekend } = cell;
-  const trained = tags.length > 0;
-  const primary = tags[0];
+  const trained = records.length > 0;
+  // Fall back to a neutral postmark when a session's program no longer exists
+  // (e.g. its dayId points at a deleted/replaced program) so the day still
+  // shows a stamp and stays editable instead of looking blank.
+  const primary = tags[0] || (trained ? { tag: "✓", accent: TE.ink3 } : null);
   const secondary = tags[1];
 
   const canEdit = trained && typeof onEditHistory === "function";

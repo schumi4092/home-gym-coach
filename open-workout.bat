@@ -2,11 +2,15 @@
 setlocal
 cd /d "%~dp0"
 
+REM Port 8780-8800 falls inside a Windows-reserved TCP range (8765-8864), which
+REM causes EACCES on bind. 8088 is outside every reserved range. Change if needed.
+set "PORT=8088"
+
 where node >nul 2>nul
 if errorlevel 1 (
   echo [!] Node.js not found in PATH. Falling back to the legacy PowerShell server.
   echo.
-  powershell -ExecutionPolicy Bypass -File "%~dp0serve-workout.ps1"
+  powershell -ExecutionPolicy Bypass -File "%~dp0serve-workout.ps1" -StartPort 8088 -EndPort 8099
   echo.
   echo [Legacy server stopped. Exit code %ERRORLEVEL%]
   pause

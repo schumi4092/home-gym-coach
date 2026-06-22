@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { T, iconButtonStyle, inputBaseStyle, panelStyle, primaryButtonStyle } from "../constants/theme.js";
+import { getExerciseStep, normalizeLoad, WEIGHT_STEP_OPTIONS } from "../utils/workout.js";
 
 export function ProgramEditor({ programs, onBack, onSave, isDesktop }) {
   const [draft, setDraft] = useState(() => JSON.parse(JSON.stringify(programs)));
@@ -42,8 +43,9 @@ export function ProgramEditor({ programs, onBack, onSave, isDesktop }) {
       .filter((exercise) => exercise.name.trim() !== "")
       .map((exercise) => ({
         name: exercise.name.trim(),
-        weight: Number(exercise.weight) || 0,
+        weight: normalizeLoad(exercise.weight),
         unit: exercise.unit,
+        step: getExerciseStep(exercise),
         sets: Math.max(1, Number(exercise.sets) || 1),
         repRange: exercise.repRange.trim() || "8-12",
         note: exercise.note ?? "",
@@ -98,13 +100,18 @@ export function ProgramEditor({ programs, onBack, onSave, isDesktop }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {selectedProgram.exercises.map((exercise, index) => (
                   <div key={`${exercise.name}-${index}`} style={{ background: T.bg3, borderRadius: 12, padding: "12px 12px", border: `1px solid ${T.border}` }}>
-                    <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "minmax(180px,1.4fr) 90px 80px 90px 110px auto" : "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "minmax(180px,1.4fr) 90px 80px 90px 90px 110px auto" : "1fr 1fr", gap: 8, marginBottom: 8 }}>
                       <input value={exercise.name} onChange={(event) => updateExerciseField(selectedProgram.id, index, "name", event.target.value)} placeholder="動作名稱" style={{ height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg, color: T.t1, padding: "0 10px" }} />
                       <input type="number" value={exercise.weight} step="0.125" min="0" onChange={(event) => updateExerciseField(selectedProgram.id, index, "weight", Number(event.target.value))} placeholder="重量" style={{ height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg, color: T.t1, padding: "0 10px" }} />
                       <select value={exercise.unit} onChange={(event) => updateExerciseField(selectedProgram.id, index, "unit", event.target.value)} style={{ height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg, color: T.t1, padding: "0 10px" }}>
                         <option value="kg">kg</option>
                         <option value="bw">bw</option>
                         <option value="sec">sec</option>
+                      </select>
+                      <select value={String(getExerciseStep(exercise))} onChange={(event) => updateExerciseField(selectedProgram.id, index, "step", Number(event.target.value))} style={{ height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg, color: T.t1, padding: "0 10px" }}>
+                        {WEIGHT_STEP_OPTIONS.map((step) => (
+                          <option key={step} value={step}>{step}</option>
+                        ))}
                       </select>
                       <input type="number" value={exercise.sets} min="1" onChange={(event) => updateExerciseField(selectedProgram.id, index, "sets", Number(event.target.value))} placeholder="組數" style={{ height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg, color: T.t1, padding: "0 10px" }} />
                       <input value={exercise.repRange} onChange={(event) => updateExerciseField(selectedProgram.id, index, "repRange", event.target.value)} placeholder="8-12 / AMRAP" style={{ height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg, color: T.t1, padding: "0 10px" }} />

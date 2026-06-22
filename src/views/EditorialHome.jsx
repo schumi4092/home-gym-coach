@@ -31,7 +31,6 @@ export function EditorialHome({
     lastSameProgram,
     weeklySessions,
     weeklyMinutes,
-    weeklySets,
     recentAvgRpe,
     lastSameProgramDate,
     estimatedMinutes,

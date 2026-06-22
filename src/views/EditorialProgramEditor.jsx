@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { TE, ES, primaryBtn, secondaryBtn } from "../constants/editorial-theme.js";
+import { getExerciseStep, normalizeLoad, WEIGHT_STEP_OPTIONS } from "../utils/workout.js";
 
 const inputStyle = {
   width: "100%",
@@ -69,8 +70,9 @@ export function EditorialProgramEditor({ programs, onBack, onSave }) {
       .filter((ex) => ex.name.trim() !== "")
       .map((ex) => ({
         name: ex.name.trim(),
-        weight: Number(ex.weight) || 0,
+        weight: normalizeLoad(ex.weight),
         unit: ex.unit,
+        step: getExerciseStep(ex),
         sets: Math.max(1, Number(ex.sets) || 1),
         repRange: ex.repRange.trim() || "8-12",
         note: ex.note ?? "",
@@ -162,7 +164,7 @@ export function EditorialProgramEditor({ programs, onBack, onSave }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 0, borderTop: `1px solid ${TE.ink}` }}>
                 {selectedProgram.exercises.map((exercise, index) => (
                   <div key={index} style={{ padding: "16px 2px", borderBottom: `1px solid ${TE.ink4}` }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "24px minmax(160px,1.4fr) 100px 80px 80px 120px 60px", gap: 12, alignItems: "end" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "24px minmax(160px,1.4fr) 100px 80px 90px 80px 120px 60px", gap: 12, alignItems: "end" }}>
                       <div style={{ ...ES.monoNum, fontSize: 14, color: TE.ink3, paddingBottom: 10 }}>
                         {String(index + 1).padStart(2, "0")}
                       </div>
@@ -177,6 +179,13 @@ export function EditorialProgramEditor({ programs, onBack, onSave }) {
                           <option value="kg">kg</option>
                           <option value="bw">bw</option>
                           <option value="sec">sec</option>
+                        </select>
+                      </LabeledField>
+                      <LabeledField label="Step" small>
+                        <select value={String(getExerciseStep(exercise))} onChange={(e) => updateExerciseField(selectedProgram.id, index, "step", Number(e.target.value))} style={selectStyle}>
+                          {WEIGHT_STEP_OPTIONS.map((step) => (
+                            <option key={step} value={step}>{step}</option>
+                          ))}
                         </select>
                       </LabeledField>
                       <LabeledField label="Sets" small>
